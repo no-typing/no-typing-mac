@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>No-Typing</string>
+	<key>CFBundleExecutable</key>
+	<string>No-Typing</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>No-Typing</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.4</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.no_typing.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.no_typing.oauth</string>
+				<string>no_typing</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>16</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>We need accessibility access to insert transcribed text into other applications.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>We need to control other applications to insert transcribed text.</string>
+	<key>NSFileProviderDomainUsageDescription</key>
+	<string>We need access to files to save and load transcriptions.</string>
+	<key>NSInputMethodsUsageDescription</key>
+	<string>We need access to input methods to insert transcribed text into other applications.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app requires microphone access to record audio for real-time transcription.</string>
+	<key>NSNetworkUsageDescription</key>
+	<string>We need network access to communicate with our transcription service.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>We use speech recognition to detect when you're speaking, which helps us automatically start and stop recording at the right moments. This enables our streaming mode to capture your speech perfectly.</string>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>This app needs to run the whisper executable for speech recognition.</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableDownloaderService</key>
+	<false/>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUEnableJavaScript</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>YOUR_UPDATE_SERVER_URL/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>YOUR_SPARKLE_PUBLIC_KEY</string>
+	<key>SUShowReleaseNotes</key>
+	<true/>
+</dict>
+</plist>

@@ -1,0 +1,397 @@
+import SwiftUI
+
+struct UnifiedSettingsView: View {
+    @EnvironmentObject var audioManager: AudioManager
+    @StateObject private var hotkeyManager = HotkeyManager.shared
+    @StateObject private var whisperManager = WhisperManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var selectedSection: SettingsSection = .recentActivity
+    
+    // Permission states
+    @State private var hasPermissionIssues = false
+    @State private var hasModelIssues = false
+    
+    enum SettingsSection: String, CaseIterable {
+        case recentActivity = "Activity"
+        case modelSettings = "Models"
+        case hotkeys = "Hotkeys"
+        case textReplacements = "Text"
+        case appSettings = "Settings"
+        case support = "Support"
+        #if DEVELOPMENT
+        case developer = "Developer"
+        #endif
+        
+        var icon: String {
+            switch self {
+            case .recentActivity: return "clock.arrow.circlepath"
+            case .modelSettings: return "waveform.circle"
+            case .hotkeys: return "keyboard"
+            case .textReplacements: return "textformat.alt"
+            case .appSettings: return "gearshape"
+            case .support: return "megaphone"
+            #if DEVELOPMENT
+            case .developer: return "hammer.fill"
+            #endif
+            }
+        }
+        
+        var color: Color {
+            switch self {
+            case .recentActivity: return .indigo
+            case .modelSettings: return .blue
+            case .hotkeys: return .purple
+            case .textReplacements: return .cyan
+            case .appSettings: return .green
+            case .support: return .orange
+            #if DEVELOPMENT
+            case .developer: return .red
+            #endif
+            }
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // MARK: - Custom Sidebar
+            VStack(spacing: 0) {
+                // Window control spacing
+                    Spacer().frame(height: 30)
+                    
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 8) {
+                            ForEach(SettingsSection.allCases, id: \.self) { section in
+                                sidebarItem(for: section)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 16)
+                    }
+                    
+                    Spacer()
+                }
+                .frame(width: 90)
+                .background(ThemeColors.sidebarBackground)
+            
+            // MARK: - Main Content Area
+            VStack(spacing: 0) {
+                // Top bar with App Logo and Name
+                HStack(spacing: 12) {
+                    if let appIcon = NSImage(named: "AppIcon") {
+                        Image(nsImage: appIcon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                            .cornerRadius(6)
+                    }
+                    
+                    Text("No-Typing")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                }
+                .padding(.leading, 32)
+                .padding(.top, 24)
+                .padding(.bottom, 8)
+                // We use clear background here to let the main content background show through
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 32) {
+                        switch selectedSection {
+                        case .recentActivity:
+                            historySection
+                        case .modelSettings:
+                            modelSettingsSection
+                        case .hotkeys:
+                            hotkeysSection
+                        case .textReplacements:
+                            textReplacementsSection
+                        case .appSettings:
+                            appSettingsSection
+                        case .support:
+                            supportSection
+                        #if DEVELOPMENT
+                        case .developer:
+                            developerSection
+                        #endif
+                        }
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(ThemeColors.contentBackground)
+        }
+        .ignoresSafeArea()
+        .frame(minWidth: 800, idealWidth: 1000, maxWidth: .infinity, minHeight: 600)
+
+        .onAppear {
+            checkForIssues()
+        }
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+            checkForIssues()
+        }
+    }
+    
+    private func sidebarItem(for section: SettingsSection) -> some View {
+        let isSelected = selectedSection == section
+        let hasWarning = (section == .appSettings && hasPermissionIssues) ||
+                         (section == .modelSettings && hasModelIssues)
+        
+        return Button(action: {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                selectedSection = section
+            }
+        }) {
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 6) {
+                    Image(systemName: section.icon)
+                        .font(.system(size: 20, weight: .light))
+                        .foregroundColor(isSelected ? .white : .white.opacity(0.8))
+                    
+                    Text(section.rawValue)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundColor(isSelected ? .white : .white.opacity(0.8))
+                        .lineLimit(1)
+                }
+                .padding(.vertical, 14)
+                .frame(width: 72)
+                .background(isSelected ? ThemeColors.pillSelection : Color.clear)
+                .overlay(    
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isSelected ? Color.clear : Color.white.opacity(0.15), lineWidth: 0.5)
+                )
+                .cornerRadius(12)
+                .contentShape(Rectangle())
+                
+                if hasWarning {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                        .offset(x: -6, y: 6)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func checkForIssues() {
+        // Check permissions
+        PermissionManager.shared.checkMicrophonePermission { micGranted in
+            let accessibilityGranted = PermissionManager.shared.checkAccessibilityPermission()
+            
+            PermissionManager.shared.checkSpeechRecognitionPermission { speechGranted in
+                DispatchQueue.main.async {
+                    self.hasPermissionIssues = !(micGranted && accessibilityGranted && speechGranted)
+                }
+            }
+        }
+        
+        // Check model status
+        if let model = whisperManager.availableModels.first {
+            hasModelIssues = !model.isAvailable && !whisperManager.isDownloading
+        } else {
+            hasModelIssues = true
+        }
+    }
+    
+    // MARK: - History Section
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("My Activity")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+             }
+            .padding(.bottom, 8)
+            
+            TranscriptionHistoryView()
+                .settingsCardStyle()
+        }
+    }
+    
+    // MARK: - Model Settings Section
+    private var modelSettingsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section Header
+            Text("Model Settings")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.bottom, 8)
+            
+            WhisperModelSelectionView(
+                showTitle: false,
+                showDescription: true
+            )
+            .settingsCardStyle()
+        }
+    }
+    
+    // MARK: - Hotkeys Section
+    private var hotkeysSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Hotkeys")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text("Configure your keyboard shortcuts")
+                    .font(.subheadline)
+                    .foregroundColor(ThemeColors.secondaryText)
+            }
+            .padding(.bottom, 8)
+            
+            HotKeysView()
+                .settingsCardStyle()
+        }
+    }
+    
+    // MARK: - Text Replacements Section
+    private var textReplacementsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Text Replacements")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text("Replace specific text with your preferred alternatives, including name variations")
+                    .font(.subheadline)
+                    .foregroundColor(ThemeColors.secondaryText)
+            }
+            .padding(.bottom, 8)
+            
+            TextReplacementsView()
+                .settingsCardStyle()
+        }
+    }
+    
+    // MARK: - App Settings Section
+    private var appSettingsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("App Settings")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text("Configure general application settings")
+                    .font(.subheadline)
+                    .foregroundColor(ThemeColors.secondaryText)
+            }
+            .padding(.bottom, 8)
+            
+            AppSetupView()
+                .settingsCardStyle()
+        }
+    }
+    
+    // MARK: - Support Section
+    private var supportSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section Header
+            Text("Support & Feedback")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.bottom, 8)
+            
+            SupportView()
+                .settingsCardStyle()
+        }
+    }
+    
+    #if DEVELOPMENT
+    // MARK: - Developer Section
+    private var developerSection: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // Section Header
+            Text("Developer Settings")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+            
+            Text("Debug options for development")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            // Onboarding Settings
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Onboarding")
+                    .font(.headline)
+                
+                HStack {
+                    Text("Onboarding Status")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(UserDefaults.standard.hasCompletedOnboarding ? "Completed" : "Not Completed")
+                        .foregroundColor(UserDefaults.standard.hasCompletedOnboarding ? .green : .orange)
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Text("Current Step")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(UserDefaults.standard.integer(forKey: "currentOnboardingStep"))")
+                        .fontWeight(.medium)
+                }
+                
+                Divider()
+                
+                Button(action: {
+                    UserDefaults.standard.hasCompletedOnboarding = false
+                    UserDefaults.standard.set(1, forKey: "currentOnboardingStep")
+                    
+                    // Restart the app
+                    let task = Process()
+                    task.launchPath = "/usr/bin/open"
+                    task.arguments = ["-n", Bundle.main.bundlePath]
+                    task.launch()
+                    
+                    // Terminate current instance
+                    NSApplication.shared.terminate(nil)
+                }) {
+                    Label("Reset Onboarding", systemImage: "arrow.counterclockwise")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                
+                Button(action: {
+                    UserDefaults.standard.hasCompletedOnboarding = true
+                }) {
+                    Label("Mark Onboarding Complete", systemImage: "checkmark.circle")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                
+                Button(action: {
+                    // Reset the hotkey test completion state
+                    UserDefaults.standard.set(false, forKey: "fnKeySetupComplete")
+                    UserDefaults.standard.synchronize()
+                }) {
+                    Label("Reset Hotkey Test", systemImage: "keyboard.badge.ellipsis")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+            }
+            .padding()
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(8)
+            
+            Spacer()
+        }
+    }
+    #endif
+}
+
+// Preview
+struct UnifiedSettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        UnifiedSettingsView()
+            .environmentObject(AudioManager())
+    }
+}

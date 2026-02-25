@@ -16,6 +16,7 @@ struct UnifiedSettingsView: View {
         case modelSettings = "Models"
         case hotkeys = "Hotkeys"
         case textReplacements = "Text"
+        case transcribe = "Transcribe"
         case appSettings = "Settings"
         case support = "Support"
         #if DEVELOPMENT
@@ -28,6 +29,7 @@ struct UnifiedSettingsView: View {
             case .modelSettings: return "waveform.circle"
             case .hotkeys: return "keyboard"
             case .textReplacements: return "textformat.alt"
+            case .transcribe: return "doc.badge.plus"
             case .appSettings: return "gearshape"
             case .support: return "megaphone"
             #if DEVELOPMENT
@@ -42,6 +44,7 @@ struct UnifiedSettingsView: View {
             case .modelSettings: return .blue
             case .hotkeys: return .purple
             case .textReplacements: return .cyan
+            case .transcribe: return .pink
             case .appSettings: return .green
             case .support: return .orange
             #if DEVELOPMENT
@@ -107,6 +110,8 @@ struct UnifiedSettingsView: View {
                             hotkeysSection
                         case .textReplacements:
                             textReplacementsSection
+                        case .transcribe:
+                            transcribeSection
                         case .appSettings:
                             appSettingsSection
                         case .support:
@@ -167,7 +172,16 @@ struct UnifiedSettingsView: View {
                 .cornerRadius(12)
                 .contentShape(Rectangle())
                 
-                if hasWarning {
+                if section == .transcribe {
+                    Text("NEW")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.red)
+                        .cornerRadius(4)
+                        .offset(x: 5, y: -4)
+                } else if hasWarning {
                     Circle()
                         .fill(Color.red)
                         .frame(width: 8, height: 8)
@@ -267,6 +281,14 @@ struct UnifiedSettingsView: View {
             .padding(.bottom, 8)
             
             TextReplacementsView()
+                .settingsCardStyle()
+        }
+    }
+    
+    // MARK: - Transcribe Section
+    private var transcribeSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            TranscribeFileView()
                 .settingsCardStyle()
         }
     }

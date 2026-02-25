@@ -40,7 +40,7 @@ class Folder: Identifiable, ObservableObject, Codable {
         
         // Decode color from hex string
         let colorHex = try container.decode(String.self, forKey: .colorHex)
-        self.color = Color(hex: colorHex) ?? .blue
+        self.color = Color(hex: colorHex)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -88,45 +88,7 @@ class Folder: Identifiable, ObservableObject, Codable {
     }
 }
 
-// Color extension for hex conversion
-extension Color {
-    init?(hex: String) {
-        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
-        
-        var rgb: UInt64 = 0
-        
-        guard Scanner(string: hexSanitized).scanHexInt64(&rgb) else {
-            return nil
-        }
-        
-        let red = Double((rgb & 0xFF0000) >> 16) / 255.0
-        let green = Double((rgb & 0x00FF00) >> 8) / 255.0
-        let blue = Double(rgb & 0x0000FF) / 255.0
-        
-        self.init(red: red, green: green, blue: blue)
-    }
-    
-    func toHex() -> String {
-        #if os(macOS)
-        guard let color = NSColor(self).usingColorSpace(.deviceRGB) else {
-            return "#000000"
-        }
-        let r = Int(color.redComponent * 255)
-        let g = Int(color.greenComponent * 255)
-        let b = Int(color.blueComponent * 255)
-        return String(format: "#%02X%02X%02X", r, g, b)
-        #else
-        guard let components = UIColor(self).cgColor.components else {
-            return "#000000"
-        }
-        let r = Int(components[0] * 255)
-        let g = Int(components[1] * 255)
-        let b = Int(components[2] * 255)
-        return String(format: "#%02X%02X%02X", r, g, b)
-        #endif
-    }
-}
+// Color extension for hex conversion is now centralized in CommonViews.swift
 
 // FolderStorage for persistence
 class FolderStorage {

@@ -52,7 +52,7 @@ ProcessProductPackaging /Users/user/Documents/Freelancers/Giddy/Dial8/dial8-open
     Entitlements:
     
     {
-    "com.apple.application-identifier" = "2Z3N6S95DH.com.giddy.dial8";
+    "com.apple.application-identifier" = "2Z3N6S95DH.com.no-typing";
     "com.apple.developer.team-identifier" = 2Z3N6S95DH;
     "com.apple.security.accessibility" = 1;
     "com.apple.security.app-sandbox" = 0;
@@ -88,8 +88,8 @@ ProcessProductPackaging /Users/user/Documents/Freelancers/Giddy/Dial8/dial8-open
         "/Library/Caches/"
     );
     "com.apple.security.temporary-exception.mach-lookup.global-name" =     (
-        "com.giddy.dial8-spks",
-        "com.giddy.dial8-spki",
+        "com.no-typing-spks",
+        "com.no-typing-spki",
         "org.sparkle-project.Sparkle.Updater",
         "org.sparkle-project.Sparkle.InstallerStatus",
         "org.sparkle-project.Sparkle.InstallerConnection"

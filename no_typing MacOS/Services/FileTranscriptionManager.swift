@@ -20,6 +20,8 @@ class FileTranscriptionManager: ObservableObject {
         transcribedText = ""
         currentFileName = url.lastPathComponent
         
+        NotificationManager.shared.requestAuthorization()
+        
         let duration = getAudioDuration(url: url)
         
         convertTo16kHzWav(sourceURL: url) { [weak self] conversionResult in
@@ -42,8 +44,17 @@ class FileTranscriptionManager: ObservableObject {
                                 TranscriptionHistoryManager.shared.addTranscription(cleanedText, duration: duration)
                             }
                             
+                            NotificationManager.shared.sendNotification(
+                                title: "Transcription Completed",
+                                body: "Your text is ready!"
+                            )
+                            
                         case .failure(let error):
                             self?.errorMessage = error.localizedDescription
+                            NotificationManager.shared.sendNotification(
+                                title: "Transcription Failed",
+                                body: "Error: \(error.localizedDescription)"
+                            )
                         }
                     }
                 }
@@ -52,6 +63,10 @@ class FileTranscriptionManager: ObservableObject {
                     self?.isTranscribing = false
                     self?.currentFileName = nil
                     self?.errorMessage = "Failed to convert audio format: \(error.localizedDescription)"
+                    NotificationManager.shared.sendNotification(
+                        title: "Format Conversion Failed",
+                        body: "Could not read audio file: \(error.localizedDescription)"
+                    )
                 }
             }
         }

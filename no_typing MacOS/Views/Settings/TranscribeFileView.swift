@@ -356,7 +356,7 @@ struct TranscribeFileView: View {
                         }) {
                             VStack(spacing: 4) {
                                 HStack {
-                                    Image(systemName: manager.isTranscribing ? "waveform.path.ecg" : "play.fill")
+                                    Image(systemName: manager.isTranscribing ? "hourglass" : "play.fill")
                                     Text(manager.isTranscribing ? "Transcribing \(md.title?.prefix(15) ?? "Video")..." : "Transcribe Media")
                                 }
                                 if manager.isTranscribing && downloadProgress > 0.0 && downloadProgress < 1.0 {

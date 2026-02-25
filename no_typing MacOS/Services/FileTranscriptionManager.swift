@@ -7,6 +7,7 @@ class FileTranscriptionManager: ObservableObject {
     
     @Published var isTranscribing: Bool = false
     @Published var transcribedText: String = ""
+    @Published var wordCount: Int = 0
     @Published var errorMessage: String?
     @Published var currentFileName: String?
     
@@ -18,6 +19,7 @@ class FileTranscriptionManager: ObservableObject {
         isTranscribing = true
         errorMessage = nil
         transcribedText = ""
+        wordCount = 0
         currentFileName = url.lastPathComponent
         
         NotificationManager.shared.requestAuthorization()
@@ -38,10 +40,15 @@ class FileTranscriptionManager: ObservableObject {
                         switch result {
                         case .success(let text):
                             let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                            self?.transcribedText = cleanedText
+                            let formattedText = self?.formatTranscriptionAsParagraphs(cleanedText) ?? cleanedText
+                            self?.transcribedText = formattedText
                             
-                            if !cleanedText.isEmpty {
-                                TranscriptionHistoryManager.shared.addTranscription(cleanedText, duration: duration)
+                            // Calculate word count
+                            let words = formattedText.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+                            self?.wordCount = words.count
+                            
+                            if !formattedText.isEmpty {
+                                TranscriptionHistoryManager.shared.addTranscription(formattedText, duration: duration)
                             }
                             
                             NotificationManager.shared.sendNotification(
@@ -74,12 +81,49 @@ class FileTranscriptionManager: ObservableObject {
     
     func clearResult() {
         transcribedText = ""
+        wordCount = 0
         errorMessage = nil
     }
     
     private func getAudioDuration(url: URL) -> TimeInterval {
         let asset = AVURLAsset(url: url)
         return CMTimeGetSeconds(asset.duration)
+    }
+    
+    // MARK: - Smart Formatting
+    
+    /// intelligently injects paragraph breaks into raw transcription blocks
+    private func formatTranscriptionAsParagraphs(_ text: String, sentencesPerParagraph: Int = 5) -> String {
+        guard !text.isEmpty else { return text }
+        
+        var paragraphs: [String] = []
+        var currentParagraphTokens: [String] = []
+        var sentenceCount = 0
+        
+        let tagger = NSLinguisticTagger(tagSchemes: [.tokenType], options: 0)
+        tagger.string = text
+        let range = NSRange(location: 0, length: text.utf16.count)
+        let options: NSLinguisticTagger.Options = [.omitWhitespace, .joinNames]
+        
+        tagger.enumerateTags(in: range, unit: .sentence, scheme: .tokenType, options: options) { tag, tokenRange, stop in
+            if let sentenceRange = Range(tokenRange, in: text) {
+                let sentence = String(text[sentenceRange]).trimmingCharacters(in: .whitespaces)
+                currentParagraphTokens.append(sentence)
+                sentenceCount += 1
+                
+                if sentenceCount >= sentencesPerParagraph {
+                    paragraphs.append(currentParagraphTokens.joined(separator: " "))
+                    currentParagraphTokens.removeAll()
+                    sentenceCount = 0
+                }
+            }
+        }
+        
+        if !currentParagraphTokens.isEmpty {
+            paragraphs.append(currentParagraphTokens.joined(separator: " "))
+        }
+        
+        return paragraphs.joined(separator: "\n\n")
     }
     
     // MARK: - Format Conversion

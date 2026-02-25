@@ -393,6 +393,12 @@ struct TranscribeFileView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                 
+                if manager.wordCount > 0 {
+                    Text("• \(manager.wordCount) words")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(ThemeColors.secondaryText)
+                }
+                
                 Spacer()
                 
                 // Action Buttons

@@ -20,7 +20,16 @@ class StatusBarController: NSObject, ObservableObject {
         self.audioManager = audioManager
         super.init()
         DispatchQueue.main.async { [weak self] in
-            self?.setupStatusBar()
+            guard let self = self else { return }
+            self.setupStatusBar()
+            
+            // Listen for settings window requests
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(self.openSettings(_:)),
+                name: NSNotification.Name("ShowSettingsWindow"),
+                object: nil
+            )
         }
     }
     
@@ -83,6 +92,9 @@ class StatusBarController: NSObject, ObservableObject {
                         existingWindow.orderFront(nil)
                     }
                     
+                    // Show in dock
+                    NSApp.setActivationPolicy(.regular)
+                    
                     // Force app activation with more aggressive settings
                     NSApp.activate(ignoringOtherApps: true)
                     NSApp.arrangeInFront(nil)
@@ -120,6 +132,9 @@ class StatusBarController: NSObject, ObservableObject {
                 // Create window controller to keep window alive
                 let windowController = NSWindowController(window: window)
                 settingsWindowController = windowController
+                
+                // Show in dock
+                NSApp.setActivationPolicy(.regular)
                 
                 windowController.showWindow(nil)
                 window.makeKeyAndOrderFront(nil)
@@ -166,6 +181,9 @@ extension StatusBarController: NSWindowDelegate {
         if notification.object as? NSWindow === settingsWindow {
             settingsWindow = nil
             settingsWindowController = nil
+            
+            // Hide from dock
+            NSApp.setActivationPolicy(.accessory)
         }
     }
     

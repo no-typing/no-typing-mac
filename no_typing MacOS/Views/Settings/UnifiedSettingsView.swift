@@ -15,7 +15,7 @@ struct UnifiedSettingsView: View {
         case recentActivity = "Activity"
         case modelSettings = "Models"
         case hotkeys = "Hotkeys"
-        case textReplacements = "Text"
+        case magicActions = "Magic"
         case transcribe = "Transcribe"
         case appSettings = "Settings"
         case support = "Support"
@@ -28,7 +28,7 @@ struct UnifiedSettingsView: View {
             case .recentActivity: return "clock.arrow.circlepath"
             case .modelSettings: return "waveform.circle"
             case .hotkeys: return "keyboard"
-            case .textReplacements: return "textformat.alt"
+            case .magicActions: return "wand.and.stars"
             case .transcribe: return "doc.badge.plus"
             case .appSettings: return "gearshape"
             case .support: return "megaphone"
@@ -43,7 +43,7 @@ struct UnifiedSettingsView: View {
             case .recentActivity: return .indigo
             case .modelSettings: return .blue
             case .hotkeys: return .purple
-            case .textReplacements: return .cyan
+            case .magicActions: return .cyan
             case .transcribe: return .pink
             case .appSettings: return .green
             case .support: return .orange
@@ -92,6 +92,28 @@ struct UnifiedSettingsView: View {
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                     
+                    if hasPermissionIssues {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedSection = .appSettings
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 10))
+                                Text("Access Needed")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.orange)
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.leading, 4)
+                    }
+                    
                     Spacer()
                 }
                 .padding(.leading, 32)
@@ -108,8 +130,8 @@ struct UnifiedSettingsView: View {
                             modelSettingsSection
                         case .hotkeys:
                             hotkeysSection
-                        case .textReplacements:
-                            textReplacementsSection
+                        case .magicActions:
+                            magicActionsSection
                         case .transcribe:
                             transcribeSection
                         case .appSettings:
@@ -174,6 +196,15 @@ struct UnifiedSettingsView: View {
                 
                 if section == .transcribe {
                     Text("NEW")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: "05b523"))
+                        .cornerRadius(4)
+                        .offset(x: 5, y: -4)
+                } else if section == .magicActions {
+                    Text("HOT")
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 4)
@@ -266,11 +297,11 @@ struct UnifiedSettingsView: View {
     }
     
     // MARK: - Text Replacements Section
-    private var textReplacementsSection: some View {
+    private var magicActionsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Section Header
             VStack(alignment: .leading, spacing: 4) {
-                Text("Text Replacements")
+                Text("Magic Actions")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.white)
                 
@@ -280,7 +311,7 @@ struct UnifiedSettingsView: View {
             }
             .padding(.bottom, 8)
             
-            TextReplacementsView()
+            MagicActionsView()
                 .settingsCardStyle()
         }
     }

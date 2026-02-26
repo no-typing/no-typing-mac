@@ -220,6 +220,20 @@ class TextInsertionService {
         )
     }
     
+    /// Clears any currently inserted temporary text from the active UI component without replacing it with final text.
+    func clearTemporaryText() {
+        guard !streamingInsertedText.isEmpty else { return }
+        
+        print("🧹 Clearing temporary text: \"\(streamingInsertedText)\"")
+        
+        replaceTemporaryText(streamingInsertedText, with: "")
+        
+        // Reset streaming state completely
+        streamingInsertedText = ""
+        streamingInsertionStart = 0
+        streamingInsertedLength = 0
+    }
+    
     // MARK: - Private Methods
     
     /// Replaces temporary text with finalized text

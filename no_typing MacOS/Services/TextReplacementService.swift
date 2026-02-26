@@ -71,7 +71,13 @@ class TextReplacementService: ObservableObject {
     
     private init() {
         loadReplacements()
-        isEnabled = userDefaults.bool(forKey: enabledKey)
+        
+        if userDefaults.object(forKey: enabledKey) == nil {
+            isEnabled = true
+            userDefaults.set(true, forKey: enabledKey)
+        } else {
+            isEnabled = userDefaults.bool(forKey: enabledKey)
+        }
     }
     
     /// Apply text replacements to the given text

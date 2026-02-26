@@ -67,12 +67,9 @@ class AudioProcessingQueueService: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
-            let useGroqAPI = UserDefaults.standard.bool(forKey: "useGroqAPI")
             let useLocalWhisperModel = self.audioTranscriptionService.useLocalWhisperModel
             
-            if useGroqAPI && GroqTranscriptionService.shared.hasAPIKey {
-                self.processWithGroq(audioURL: audioURL, timestamp: timestamp)
-            } else if useLocalWhisperModel && self.whisperManager.isReady {
+            if useLocalWhisperModel && self.whisperManager.isReady {
                 self.processWithWhisper(audioURL: audioURL, timestamp: timestamp)
             } else {
                 self.sendAudioToBackend(fileURL: audioURL) {
@@ -118,36 +115,7 @@ class AudioProcessingQueueService: ObservableObject {
             }
         }
     }
-    
-    private func processWithGroq(audioURL: URL, timestamp: Date) {
-        let selectedLanguage = UserDefaults.standard.string(forKey: "selectedLanguage") ?? "english"
-        
-        let asset = AVURLAsset(url: audioURL)
-        let audioDuration = CMTimeGetSeconds(asset.duration)
-        
-        GroqTranscriptionService.shared.transcribe(
-            audioURL: audioURL,
-            language: selectedLanguage
-        ) { [weak self] result in
-            guard let self = self else { return }
-            
-            // Clean up immediately after getting result
-            try? FileManager.default.removeItem(at: audioURL)
-            
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let transcription):
-                    self.audioTranscriptionService.handleTranscriptionResult(transcription, duration: audioDuration)
-                case .failure(let error):
-                    print("Groq transcription error: \(error)")
-                }
-                
-                // Mark as done and process next
-                self.isCurrentlyProcessing = false
-                self.processNextInQueue()
-            }
-        }
-    }
+
     
     private func sendAudioToBackend(fileURL: URL, completion: @escaping () -> Void) {
         let url = URL(string: "http://localhost:8180/stt")!

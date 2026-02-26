@@ -11,6 +11,7 @@ import Sparkle      // Import Sparkle for macOS
 // Add this extension at the top of your file
 extension Notification.Name {
     static let appWillResignActive = Notification.Name("AppWillResignActive") // Add custom notification
+    static let showSettingsWindow = Notification.Name("ShowSettingsWindow")
 }
 
 // Add extension for UserDefaults
@@ -116,6 +117,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
                 self.showOnboardingSettings()
+            }
+        } else {
+            // For returning users, show the settings window automatically on launch
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                NotificationCenter.default.post(name: .showSettingsWindow, object: nil)
             }
         }
         
@@ -298,6 +305,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
 
     func applicationDidBecomeActive(_ notification: Notification) {
         // App became active - no special processing needed currently
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // If the user clicks the dock icon, show the settings window
+        NotificationCenter.default.post(name: .showSettingsWindow, object: nil)
+        return true
     }
 
     func applicationWillResignActive(_ notification: Notification) {
@@ -611,6 +624,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         if let existingWindow = onboardingWindow {
             // Window exists, bring it to front
             existingWindow.makeKeyAndOrderFront(nil)
+            
+            // Show in dock
+            NSApp.setActivationPolicy(.regular)
+            
             NSApp.activate(ignoringOtherApps: true)
             
             // If window is minimized, deminiaturize it
@@ -658,6 +675,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         let windowController = NSWindowController(window: window)
         onboardingWindowController = windowController
         
+        // Show in dock
+        NSApp.setActivationPolicy(.regular)
+        
         windowController.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -671,6 +691,9 @@ extension AppDelegate: NSWindowDelegate {
         if notification.object as? NSWindow === onboardingWindow {
             onboardingWindow = nil
             onboardingWindowController = nil
+            
+            // Hide from dock
+            NSApp.setActivationPolicy(.accessory)
         }
     }
     

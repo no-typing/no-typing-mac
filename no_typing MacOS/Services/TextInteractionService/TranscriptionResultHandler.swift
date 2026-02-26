@@ -149,6 +149,17 @@ class TranscriptionResultHandler {
     func handleTranscriptionResult(_ transcription: String, duration: TimeInterval?, isTemporary: Bool = false) {
         print("🔤 TranscriptionResultHandler: Processing \(isTemporary ? "temporary" : "final") text: \"\(transcription)\"")
         
+        // Evaluate for Voice Commands before processing as standard text
+        if !isTemporary, let action = VoiceCommandService.shared.evaluate(text: transcription) {
+            print("🎙️ Voice Command Detected: \(action)")
+            DispatchQueue.main.async {
+                TextInsertionService.shared.clearTemporaryText()
+                KeystrokeSimulator.shared.execute(action)
+            }
+            self.resetSession()
+            return
+        }
+        
         queue.async { [weak self] in
             guard let self = self else { return }
             

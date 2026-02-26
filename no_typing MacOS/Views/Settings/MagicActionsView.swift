@@ -1,10 +1,11 @@
 import SwiftUI
 import Foundation
 
-struct TextReplacementsView: View {
+struct MagicActionsView: View {
     @StateObject private var replacementService = TextReplacementService.shared
     @State private var showingAddSheet = false
     @State private var editingReplacement: TextReplacement? = nil
+    @State private var selectedTab: Int = 0
     @Environment(\.colorScheme) private var colorScheme
     
     private var mainBackgroundColor: Color {
@@ -17,11 +18,19 @@ struct TextReplacementsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // Enable/Disable Toggle
-            VStack(alignment: .leading, spacing: 16) {
+            Picker("", selection: $selectedTab) {
+                Text("Smart Snips").tag(0)
+                Text("Voice Commands").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding(.bottom, 8)
+            
+            if selectedTab == 0 {
+                // Enable/Disable Toggle
+                VStack(alignment: .leading, spacing: 16) {
                 SettingsToggleRow(
                     icon: "text.cursor",
-                    title: "Smart Snippets",
+                    title: "Smart Replacements",
                     isOn: $replacementService.isEnabled,
                     iconGradient: LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
                 )
@@ -59,7 +68,7 @@ struct TextReplacementsView: View {
                 // List of replacements
                 if replacementService.replacements.isEmpty {
                     VStack(spacing: 12) {
-                        Image(systemName: "textformat.alt")
+                        Image(systemName: "wand.and.stars")
                             .font(.system(size: 24))
                             .foregroundColor(.secondary.opacity(0.6))
                         
@@ -85,6 +94,9 @@ struct TextReplacementsView: View {
                         }
                     }
                 }
+                }
+            } else {
+                VoiceCommandsView()
             }
         }
         .background(Color.clear)

@@ -113,26 +113,10 @@ class AudioTranscriptionService: ObservableObject {
         
         print("Processing audio file...")
         
-        let useGroqAPI = UserDefaults.standard.bool(forKey: "useGroqAPI")
         let asset = AVURLAsset(url: audioFileURL)
         let audioDuration = CMTimeGetSeconds(asset.duration)
         
-        if useGroqAPI && GroqTranscriptionService.shared.hasAPIKey {
-            // Use Groq API for transcription
-            GroqTranscriptionService.shared.transcribe(audioURL: audioFileURL, language: selectedLanguage) { [weak self] result in
-                guard let self = self else { return }
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let transcription):
-                        self.handleTranscriptionResult(transcription, duration: audioDuration)
-                    case .failure(let error):
-                        print("Groq transcription error: \(error)")
-                    }
-                    // Clean up the processed file
-                    try? FileManager.default.removeItem(at: audioFileURL)
-                }
-            }
-        } else if useLocalWhisperModel && WhisperManager.shared.isReady {
+        if useLocalWhisperModel && WhisperManager.shared.isReady {
             // Use local transcription with selected language
             let targetLanguage: String = selectedLanguage
 

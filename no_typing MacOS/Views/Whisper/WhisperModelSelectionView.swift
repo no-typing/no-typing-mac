@@ -18,10 +18,6 @@ struct WhisperModelSelectionView: View {
     @AppStorage("selectedTone") private var selectedTone: String = "professional"
     
     // Transcription Service properties
-    @AppStorage("useGroqAPI") private var useGroqAPI = false
-    @State private var groqAPIKeyInput: String = ""
-    @State private var hasGroqKey: Bool = false
-    @State private var groqKeySaveMessage: String = ""
     
     // Define tone categories
     struct ToneCategory {
@@ -321,75 +317,7 @@ struct WhisperModelSelectionView: View {
                         // VStack(alignment: .leading, spacing: 12) {
                         //     HStack {
                         //         Image(systemName: "cloud")
-                        //             .font(.system(size: 16))
-                        //             .foregroundColor(.blue)
-                        //         Text("Slow Device?")
-                        //             .font(.body)
-                        //             .fontWeight(.medium)
-                        //             .foregroundColor(.white)
-                        //     }
-                            
-                        //     Text("Try remote transcription for faster output on slower devices.")
-                        //         .font(.subheadline)
-                        //         .foregroundColor(ThemeColors.secondaryText)
-                            
-                        //     VStack(alignment: .leading, spacing: 12) {
-                        //         // Groq API Toggle
-                        //         SettingsToggleRow(
-                        //             icon: "bolt.fill",
-                        //             title: "Use Free Groq API",
-                        //             isOn: $useGroqAPI,
-                        //             iconGradient: LinearGradient(colors: [.purple, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        //         )
-                                
-                        //         // API Key Section (shown when Groq is enabled)
-                        //         if useGroqAPI {
-                        //             VStack(alignment: .leading, spacing: 8) {
-                        //                 Text("Groq API Key")
-                        //                     .font(.body)
-                        //                     .fontWeight(.semibold)
-                        //                     .foregroundColor(.white)
-                                        
-                        //                 HStack(spacing: 8) {
-                        //                     SecureField("Enter your API key and hit Enter", text: $groqAPIKeyInput)
-                        //                         .textFieldStyle(.roundedBorder)
-                        //                         .padding(4)
-                        //                         .background(Color.white.opacity(0.1))
-                        //                         .cornerRadius(6)
-                        //                         .onSubmit {
-                        //                             saveGroqAPIKey()
-                        //                         }
-                                            
-                        //                     Button("Get Free API Key") {
-                        //                         if let url = URL(string: "https://console.groq.com/keys") {
-                        //                             NSWorkspace.shared.open(url)
-                        //                         }
-                        //                     }
-                        //                     .buttonStyle(.plain)
-                        //                     .padding(.horizontal, 12)
-                        //                     .padding(.vertical, 6)
-                        //                     .background(ThemeColors.pillSelection)
-                        //                     .foregroundColor(.white)
-                        //                     .cornerRadius(8)
-                        //                 }
-                                        
-                        //                 if hasGroqKey {
-                        //                     Text("Current API Key: \(GroqTranscriptionService.shared.maskedAPIKey)")
-                        //                         .font(.subheadline)
-                        //                         .foregroundColor(ThemeColors.secondaryText)
-                        //                 }
-                                        
-                        //                 if !groqKeySaveMessage.isEmpty {
-                        //                     Text(groqKeySaveMessage)
-                        //                         .font(.subheadline)
-                        //                         .foregroundColor(ThemeColors.accent)
-                        //                 }
-                        //             }
-                        //             .padding(.leading, 12)
-                        //             .padding(.top, 4)
-                        //         }
-                        //     }
-                        // }
+
                         
                         Divider()
                             .padding(.vertical, 8)
@@ -577,51 +505,8 @@ struct WhisperModelSelectionView: View {
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.clear)
-                    .onAppear {
-                        loadGroqAPIKey()
-                    }
-                    .onChange(of: useGroqAPI) { newValue in
-                        if newValue {
-                            loadGroqAPIKey()
-                        }
-                    }
                 }
             
-        }
-    }
-    
-    // MARK: - Groq API Handlers
-    
-    private func saveGroqAPIKey() {
-        let key = groqAPIKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else {
-            print("⚠️ Groq API key is empty, not saving")
-            return
-        }
-        // groq api key must begin with "gsk_"
-        if !key.hasPrefix("gsk_") {
-            print("⚠️ Groq API keys begin with 'gsk_'. Please visit https://console.groq.com/ to generate a new API key. (Groq.com and not Grok xAI)")
-            return
-        }
-        print("🔑 Saving Groq API key (\(key.prefix(4))...)")
-        GroqTranscriptionService.shared.saveAPIKey(key)
-        hasGroqKey = true
-        groqKeySaveMessage = "✓ API Key saved successfully"
-        // Clear the save message after 3 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            groqKeySaveMessage = ""
-        }
-        print("🔑 Groq API key saved. hasAPIKey: \(GroqTranscriptionService.shared.hasAPIKey)")
-    }
-    
-    private func loadGroqAPIKey() {
-        hasGroqKey = GroqTranscriptionService.shared.hasAPIKey
-        if hasGroqKey {
-            groqAPIKeyInput = GroqTranscriptionService.shared.apiKey ?? ""
-            print("🔑 Loaded existing Groq API key (\(groqAPIKeyInput.prefix(4))...)")
-        } else {
-            groqAPIKeyInput = ""
-            print("🔑 No existing Groq API key found")
         }
     }
 }

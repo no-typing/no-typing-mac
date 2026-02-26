@@ -5,7 +5,7 @@ struct HistoryTableView: View {
     
     // Filtering & Search
     @State private var searchText = ""
-    @State private var selectedDateRange: DateRangeFilter = .allTime
+    @State private var selectedDateRange: DateRangeFilter = .today
     
     // Selection for Bulk Delete
     @State private var selectedItems = Set<TranscriptionHistoryItem.ID>()
@@ -238,7 +238,7 @@ struct HistoryTableView: View {
     
     private func copySelected() {
         let itemsToCopy = historyManager.transcriptionHistory.filter { selectedItems.contains($0.id) }
-        let textToCopy = itemsToCopy.map { $0.text }.joined(separator: "\n")
+        let textToCopy = itemsToCopy.map { $0.text }.joined(separator: "\n\n")
         
         #if os(macOS)
         let pasteboard = NSPasteboard.general

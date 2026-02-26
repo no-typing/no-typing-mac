@@ -30,7 +30,7 @@ struct SettingsItem: Identifiable, Equatable, Hashable {
     static let settings = SettingsItem(title: "App Settings", type: .settings, data: "settings")
     static let voiceScribe = SettingsItem(title: "Model Settings", type: .voiceScribe, data: "voice")
     static let hotKeys = SettingsItem(title: "Hotkeys", type: .hotKeys, data: "hotkeys")
-    static let textReplacements = SettingsItem(title: "Text Replacements", type: .textReplacements, data: "textReplacements")
+    static let textReplacements = SettingsItem(title: "Magic Actions", type: .textReplacements, data: "textReplacements")
     static let support = SettingsItem(title: "Support", type: .support, data: "support")
     
     static let defaultItems = [voiceScribe, hotKeys, textReplacements, settings, support]
@@ -96,7 +96,7 @@ struct SettingsDetailView: View {
     
     private var textReplacementsContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Text Replacements")
+            Text("Magic Actions")
                 .font(.title)
                 .fontWeight(.bold)
             
@@ -104,7 +104,7 @@ struct SettingsDetailView: View {
                 .font(.headline)
                 .foregroundColor(.secondary)
             
-            TextReplacementsView()
+            MagicActionsView()
         }
         .padding()
     }

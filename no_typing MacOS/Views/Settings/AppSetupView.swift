@@ -16,10 +16,36 @@ struct AppSetupView: View {
     @AppStorage("enableTranscriptionCleaning") private var enableTranscriptionCleaning = true
     @ObservedObject private var soundEffects = HUDSoundEffects.shared
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject var audioManager: AudioManager
+    @StateObject private var watchFolderManager = WatchFolderManager.shared
     
     
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
+            // Audio Input Source Section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "mic.fill")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                    Text("Audio Input Source")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                }
+                
+                Text("Select whether to record from your microphone or capture all system audio.")
+                    .font(.body)
+                    .foregroundColor(ThemeColors.secondaryText)
+                
+                Picker("", selection: $audioManager.inputSource) {
+                    ForEach(AudioInputSource.allCases) { source in
+                        Text(source.rawValue).tag(source)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.vertical, 8)
+            }
+            
             // Permission Configuration Section
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
@@ -98,6 +124,61 @@ struct AppSetupView: View {
                     )
                     .onChange(of: launchAtLogin) { newValue in
                         toggleLaunchAtLogin(newValue)
+                    }
+                }
+                .padding(8)
+            }
+            
+            // Watch Folder Section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder.badge.gearshape")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                    Text("Watch Folder")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                }
+                
+                Text("Automatically transcribe audio files dropped into this folder.")
+                    .font(.body)
+                    .foregroundColor(ThemeColors.secondaryText)
+                
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Target Directory")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            Text(watchFolderManager.watchFolderPath ?? "None Selected")
+                                .font(.caption)
+                                .foregroundColor(ThemeColors.secondaryText)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            watchFolderManager.selectFolder()
+                        }) {
+                            Text(watchFolderManager.watchFolderPath == nil ? "Select Folder" : "Change Folder")
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    if watchFolderManager.watchFolderPath != nil {
+                        SettingsToggleRow(
+                            icon: "eye",
+                            title: "Enable Watch Folder",
+                            isOn: $watchFolderManager.isWatching,
+                            iconGradient: LinearGradient(colors: [.purple, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
                     }
                 }
                 .padding(8)

@@ -10,6 +10,13 @@ enum RecordingMode {
     case transcriptionOnly  // For individual transcription (dictation mode)
 }
 
+// Define Input Sources
+enum AudioInputSource: String, CaseIterable, Identifiable {
+    case microphone = "Microphone"
+    case systemAudio = "System Audio"
+    var id: String { self.rawValue }
+}
+
 class AudioManager: ObservableObject {
     // MARK: - Published Properties
     @Published private(set) var isRecording = false
@@ -18,6 +25,7 @@ class AudioManager: ObservableObject {
     @Published var accessibilityPermissionGranted: Bool = false
     @Published var useLocalWhisperModel = true
     @Published var whisperModelIsReady: Bool = false
+    @Published var inputSource: AudioInputSource = .microphone
     
     // Flag to prevent didSet during initialization
     private var isInitializing = true
@@ -67,6 +75,7 @@ class AudioManager: ObservableObject {
     private let audioHUDService: AudioHUDService
     private let audioEngineService = AudioEngineService()
     private let recordingService: AudioRecordingService
+    private let systemAudioService = SystemAudioCaptureManager.shared
     private let audioTranscriptionService = AudioTranscriptionService.shared
     private let speechDetectionService = AudioSpeechDetectionService()
     
@@ -365,16 +374,32 @@ class AudioManager: ObservableObject {
             }
         }
         
-        // Ensure microphone permission is granted first
-        audioPermissionService.requestMicrophonePermission { [weak self] granted in
-            guard let self = self else { return }
-            if granted {
+        // Ensure permission is granted first based on input source
+        if inputSource == .microphone {
+            audioPermissionService.requestMicrophonePermission { [weak self] granted in
+                guard let self = self else { return }
+                if granted {
+                    DispatchQueue.main.async {
+                        // Setup the audio engine with a completion handler
+                        self.setupAudioEngineForRecording()
+                    }
+                } else {
+                    print("Microphone access not granted.")
+                    DispatchQueue.main.async {
+                        self.isRecording = false
+                        self.isAudioSetupInProgress = false
+                        self.hideNotchIndicator()
+                    }
+                }
+            }
+        } else if inputSource == .systemAudio {
+            systemAudioService.requestPermission()
+            if systemAudioService.hasPermission {
                 DispatchQueue.main.async {
-                    // Setup the audio engine with a completion handler
-                    self.setupAudioEngineForRecording()
+                    self.setupSystemAudioForRecording()
                 }
             } else {
-                print("Microphone access not granted.")
+                print("Screen recording access not granted for System Audio.")
                 DispatchQueue.main.async {
                     self.isRecording = false
                     self.isAudioSetupInProgress = false
@@ -402,7 +427,14 @@ class AudioManager: ObservableObject {
             
             // First, force creation of a new segment to capture any current audio
             // This must happen BEFORE we stop speech detection or mark recording as false
-            if let currentSegmentURL = recordingService.startNewAudioSegment() {
+            let currentSegmentURL: URL?
+            if inputSource == .microphone {
+                currentSegmentURL = recordingService.startNewAudioSegment()
+            } else {
+                currentSegmentURL = systemAudioService.startNewAudioSegment()
+            }
+            
+            if let currentSegmentURL = currentSegmentURL {
                 print("📝 Block mode: Adding current segment to processing queue")
                 let segmentTimestamp = self.speechDetectionService.getLastSpeechTime() ?? Date()
                 audioProcessingQueueService.addToProcessingQueue(
@@ -435,44 +467,59 @@ class AudioManager: ObservableObject {
         speechDetectionService.stopSpeechDetection()
         
         // Stop the recording and get the final audio file
-        recordingService.stopRecording { [weak self] finalFileURL in
-            guard let self = self else { return }
-            
-            // If there's a final file, add it to the processing queue
-            if let finalFileURL = finalFileURL {
-                print("📝 Adding final audio segment to processing queue")
-                let finalTimestamp = self.speechDetectionService.getLastSpeechTime() ?? Date()
-                self.audioProcessingQueueService.addToProcessingQueue(
-                    audioURL: finalFileURL,
-                    timestamp: finalTimestamp
-                )
+        if inputSource == .microphone {
+            recordingService.stopRecording { [weak self] finalFileURL in
+                self?.handleFinalAudioSegment(finalFileURL: finalFileURL)
             }
-            
-            // For block mode, wait a bit for processing to complete, then flush
-            if !self.isStreamingMode {
-                // Monitor the queue and flush when it's empty
-                self.monitorQueueAndFlushWhenComplete()
+        } else {
+            Task {
+                await systemAudioService.stopRecording()
+                let finalFileURL = systemAudioService.currentFileURL
+                DispatchQueue.main.async { [weak self] in
+                    self?.handleFinalAudioSegment(finalFileURL: finalFileURL)
+                }
             }
-            
-            // Use segmentation service to handle accumulated text
-            self.audioSegmentationService.handleAccumulatedText(
-                isStreamingMode: self.isStreamingMode,
-                lastSpeechTime: self.speechDetectionService.getLastSpeechTime()
+        }
+    }
+    
+    private func handleFinalAudioSegment(finalFileURL: URL?) {
+        
+        // If there's a final file, add it to the processing queue
+        if let finalFileURL = finalFileURL {
+            print("📝 Adding final audio segment to processing queue")
+            let finalTimestamp = self.speechDetectionService.getLastSpeechTime() ?? Date()
+            self.audioProcessingQueueService.addToProcessingQueue(
+                audioURL: finalFileURL,
+                timestamp: finalTimestamp
             )
-            
-            // Clean up audio engine
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                print("🔇 Stopping audio engine...")
+        }
+        
+        // For block mode, wait a bit for processing to complete, then flush
+        if !self.isStreamingMode {
+            // Monitor the queue and flush when it's empty
+            self.monitorQueueAndFlushWhenComplete()
+        }
+        
+        // Use segmentation service to handle accumulated text
+        self.audioSegmentationService.handleAccumulatedText(
+            isStreamingMode: self.isStreamingMode,
+            lastSpeechTime: self.speechDetectionService.getLastSpeechTime()
+        )
+        
+        // Clean up audio engine
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            print("🔇 Stopping audio capture engine...")
+            if self.inputSource == .microphone {
                 self.audioEngineService.stopEngine()
-                
-                // Reset all state
-                self.isStoppingRecording = false
-                self.recordingMode = nil
-                self.recordingStartTime = nil
-                
-                // Schedule final cleanup
-                self.audioCleanupService.scheduleCleanup()
             }
+            
+            // Reset all state
+            self.isStoppingRecording = false
+            self.recordingMode = nil
+            self.recordingStartTime = nil
+            
+            // Schedule final cleanup
+            self.audioCleanupService.scheduleCleanup()
         }
     }
     
@@ -578,6 +625,48 @@ class AudioManager: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             // Check engine state and wait for it to be ready
             self?.checkEngineReadyAndStartRecording()
+        }
+    }
+    
+    private func setupSystemAudioForRecording() {
+        print("AudioManager: Setting up system audio for recording via SCK")
+        
+        // Add a minimum delay to ensure loading animation is visible
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.checkSystemAudioReadyAndStartRecording()
+        }
+    }
+    
+    private func checkSystemAudioReadyAndStartRecording(attempts: Int = 0) {
+        Task { @MainActor in
+            do {
+                try await systemAudioService.startRecording()
+                
+                print("AudioManager: System audio capture started successfully")
+                
+                // Set up audio buffer callback for level monitoring natively
+                systemAudioService.onAudioBuffer = { buffer in
+                    AudioLevelMonitor.shared.processAudioBuffer(buffer)
+                }
+                
+                // Sync recording start time (approximate, since SCK runs async)
+                self.recordingStartTime = Date()
+                
+                // Allow UI to stop loading
+                self.isAudioSetupInProgress = false
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    HUDSoundEffects.shared.playReadySound()
+                }
+                
+                self.engineStartupRetryCount = 0
+                
+            } catch {
+                print("AudioManager: Failed to start System Audio via SCK: \(error)")
+                self.isRecording = false
+                self.isAudioSetupInProgress = false
+                self.showEngineFailedNotification()
+            }
         }
     }
     

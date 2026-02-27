@@ -151,15 +151,71 @@ class TranscriptionCleaner {
         """
         
         do {
-            if #available(macOS 26.0, *) {
-                let session = LanguageModelSession()
-                let response = try await session.respond(to: prompt)
-                let cleanedText = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
-                
-                // Ensure we don't return empty text
+            let openAIAvailable = OpenAIManager.shared.hasValidKey
+            let anthropicAvailable = AnthropicManager.shared.hasValidKey
+            let openaiModel = UserDefaults.standard.string(forKey: "openaiModelSelection") ?? OpenAIModel.gpt4o.rawValue
+            let anthropicModel = UserDefaults.standard.string(forKey: "anthropicModelSelection") ?? AnthropicModel.claude35Sonnet.rawValue
+            
+            // Extended LLMs
+            let extendedProviderRaw = UserDefaults.standard.string(forKey: "extendedLLMProvider") ?? LLMProvider.groq.rawValue
+            let extendedProvider = LLMProvider(rawValue: extendedProviderRaw) ?? .custom
+            let extendedGroqKey = UserDefaults.standard.string(forKey: "groqApiKey") ?? ""
+            let extendedDeepseekKey = UserDefaults.standard.string(forKey: "deepseekApiKey") ?? ""
+            let extendedOllamaURL = UserDefaults.standard.string(forKey: "ollamaBaseURL") ?? "http://localhost:11434/v1/chat/completions"
+            let extendedCustomURL = UserDefaults.standard.string(forKey: "customLLMBaseURL") ?? "https://api.openai.com/v1/chat/completions"
+            let extendedCustomKey = UserDefaults.standard.string(forKey: "customLLMApiKey") ?? ""
+            
+            var extendedKey = ""
+            var extendedURL = ""
+            var extendedModel = ""
+            var extendedIsConfigured = false
+            
+            switch extendedProvider {
+            case .groq:
+                extendedKey = extendedGroqKey
+                extendedURL = "https://api.groq.com/openai/v1/chat/completions"
+                extendedModel = UserDefaults.standard.string(forKey: "groqModel") ?? "llama3-70b-8192"
+                extendedIsConfigured = !extendedKey.isEmpty
+            case .deepseek:
+                extendedKey = extendedDeepseekKey
+                extendedURL = "https://api.deepseek.com/chat/completions"
+                extendedModel = UserDefaults.standard.string(forKey: "deepseekModel") ?? "deepseek-chat"
+                extendedIsConfigured = !extendedKey.isEmpty
+            case .ollama:
+                extendedKey = ""
+                extendedURL = extendedOllamaURL
+                extendedModel = UserDefaults.standard.string(forKey: "ollamaModel") ?? "llama3"
+                extendedIsConfigured = !extendedURL.isEmpty
+            case .custom:
+                extendedKey = extendedCustomKey
+                extendedURL = extendedCustomURL
+                extendedModel = UserDefaults.standard.string(forKey: "customLLMModel") ?? "gpt-4"
+                extendedIsConfigured = !extendedURL.isEmpty
+            }
+            
+            if openAIAvailable {
+                let response = try await OpenAIManager.shared.improveText(prompt: prompt, text: rawText, model: openaiModel)
+                let cleanedText = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                return cleanedText.isEmpty ? trimmedText : cleanedText
+            } else if anthropicAvailable {
+                let response = try await AnthropicManager.shared.improveText(prompt: prompt, text: rawText, model: anthropicModel)
+                let cleanedText = response.trimmingCharacters(in: .whitespacesAndNewlines)
+                return cleanedText.isEmpty ? trimmedText : cleanedText
+            } else if extendedIsConfigured {
+                let response = try await ExtendedLLMManager.shared.improveText(prompt: prompt, text: rawText, provider: extendedProvider, apiKey: extendedKey, baseURL: extendedURL, model: extendedModel)
+                let cleanedText = response.trimmingCharacters(in: .whitespacesAndNewlines)
                 return cleanedText.isEmpty ? trimmedText : cleanedText
             } else {
-                return trimmedText
+                if #available(macOS 26.0, *) {
+                    let session = LanguageModelSession()
+                    let response = try await session.respond(to: prompt)
+                    let cleanedText = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    // Ensure we don't return empty text
+                    return cleanedText.isEmpty ? trimmedText : cleanedText
+                } else {
+                    return trimmedText
+                }
             }
         } catch {
             print("⚠️ TranscriptionCleaner: Failed to clean text - \(error.localizedDescription)")

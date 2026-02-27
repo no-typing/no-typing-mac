@@ -18,6 +18,7 @@ struct UnifiedSettingsView: View {
         case magicActions = "Magic"
         case transcribe = "Transcribe"
         case appSettings = "Settings"
+        case integrations = "Webhooks"
         case support = "Support"
         #if DEVELOPMENT
         case developer = "Developer"
@@ -31,6 +32,7 @@ struct UnifiedSettingsView: View {
             case .magicActions: return "wand.and.stars"
             case .transcribe: return "doc.badge.plus"
             case .appSettings: return "gearshape"
+            case .integrations: return "network"
             case .support: return "megaphone"
             #if DEVELOPMENT
             case .developer: return "hammer.fill"
@@ -46,6 +48,7 @@ struct UnifiedSettingsView: View {
             case .magicActions: return .cyan
             case .transcribe: return .pink
             case .appSettings: return .green
+            case .integrations: return .teal
             case .support: return .orange
             #if DEVELOPMENT
             case .developer: return .red
@@ -136,8 +139,10 @@ struct UnifiedSettingsView: View {
                             transcribeSection
                         case .appSettings:
                             appSettingsSection
+                        case .integrations:
+                            integrationsSection
                         case .support:
-                            supportSection
+                            SupportView()
                         #if DEVELOPMENT
                         case .developer:
                             developerSection
@@ -273,6 +278,21 @@ struct UnifiedSettingsView: View {
                 showDescription: true
             )
             .settingsCardStyle()
+            
+            DeepLSettingsView()
+                .settingsCardStyle()
+                
+            OpenAISettingsView()
+                .settingsCardStyle()
+                
+            AnthropicSettingsView()
+                .settingsCardStyle()
+                
+            ExtendedLLMSettingsView()
+                .settingsCardStyle()
+                
+            CloudTranscriptionSettingsView()
+                .settingsCardStyle()
         }
     }
     
@@ -340,6 +360,14 @@ struct UnifiedSettingsView: View {
             .padding(.bottom, 8)
             
             AppSetupView()
+                .settingsCardStyle()
+        }
+    }
+    
+    // MARK: - Integrations Section
+    private var integrationsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            WebhookSettingsView()
                 .settingsCardStyle()
         }
     }

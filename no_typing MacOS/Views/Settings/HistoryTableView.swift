@@ -24,6 +24,9 @@ struct HistoryTableView: View {
         var id: String { self.rawValue }
     }
     
+    // Detail View Routing
+    @State private var selectedItemForDetail: TranscriptionHistoryItem?
+    
     // MARK: - Computed Properties
     
     private var filteredItems: [TranscriptionHistoryItem] {
@@ -68,9 +71,48 @@ struct HistoryTableView: View {
         return max(1, Int(ceil(Double(filteredItems.count) / Double(itemsPerPage))))
     }
     
-    // MARK: - View Body
-    
     var body: some View {
+        if let selectedItem = selectedItemForDetail {
+            TranscriptDetailView(item: selectedItem) { updatedItem in
+                // Sync the update down to the global manager
+                historyManager.updateTranscription(updatedItem)
+                
+                // Allow the view to update
+                selectedItemForDetail = updatedItem
+            }
+            // Animate transition back to table
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            .overlay(alignment: .topLeading) {
+                // Intercept the default 'Back' button behavior of TranscriptDetailView
+                // by replacing its dismiss action with our own router logic.
+                // We do this by placing an invisible button over it, or just 
+                // having TranscriptDetailView use a custom dismissal closure,
+                // but for simplicity we'll just add a "Close" button here.
+                Button(action: {
+                    withAnimation(.spring()) {
+                        selectedItemForDetail = nil
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .foregroundColor(.blue)
+                .padding()
+                .background(Color(nsColor: .controlBackgroundColor))
+                // Only show if we actually need a back button overlay, but TranscriptDetailView has one.
+                // We'll trust TranscriptDetailView's built-in header, but we need
+                // a way for it to tell us to close. Let's pass a binding instead.
+            }
+        } else {
+            tableView
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+        }
+    }
+    
+    var tableView: some View {
         VStack(spacing: 0) {
             
             // Toolbar (Search, Filter, Delete)
@@ -164,7 +206,11 @@ struct HistoryTableView: View {
             } else {
                 List(selection: $selectedItems) {
                     ForEach(paginatedItems) { item in
-                        HistoryTableRow(item: item)
+                        HistoryTableRow(item: item) {
+                            withAnimation(.spring()) {
+                                self.selectedItemForDetail = item
+                            }
+                        }
                             .tag(item.id)
                             .listRowBackground(Color.clear)
                             .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
@@ -256,6 +302,8 @@ struct HistoryTableView: View {
 
 struct HistoryTableRow: View {
     let item: TranscriptionHistoryItem
+    var onTap: () -> Void
+    
     @State private var isHovered = false
     
     var body: some View {
@@ -279,8 +327,43 @@ struct HistoryTableRow: View {
         .padding(.horizontal, 12)
         .background(isHovered ? Color.white.opacity(0.05) : Color.clear)
         .cornerRadius(6)
+        .contentShape(Rectangle()) // Makes the whole row clickable
+        .onTapGesture(perform: onTap)
         .onHover { hovering in
             isHovered = hovering
         }
+        .contextMenu {
+            Button(action: { copyToClipboard() }) {
+                Label("Copy Text", systemImage: "doc.on.doc")
+            }
+            
+            Divider()
+            
+            Menu("Export As...") {
+                ForEach(ExportManager.ExportFormat.allCases, id: \.self) { format in
+                    Button(action: {
+                        ExportManager.shared.exportItem(item, format: format) { result in
+                            switch result {
+                            case .success(let url):
+                                print("Exported successfully to: \(url.path)")
+                                NotificationManager.shared.sendNotification(title: "Export Successful", body: "Saved to \(url.lastPathComponent)")
+                            case .failure(let error):
+                                print("Export failed: \(error)")
+                            }
+                        }
+                    }) {
+                        Text(format.rawValue)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func copyToClipboard() {
+        #if os(macOS)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(item.text, forType: .string)
+        #endif
     }
 }

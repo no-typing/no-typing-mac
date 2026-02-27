@@ -69,11 +69,11 @@ class TranscriptionHistoryManager: ObservableObject {
         loadAndRolloverStats()
     }
     
-    func addTranscription(_ text: String, duration: TimeInterval? = nil) {
+    func addTranscription(_ text: String, duration: TimeInterval? = nil, segments: [WhisperTranscriptionSegment]? = nil, sourceMediaData: Data? = nil) {
         // Don't add empty transcriptions
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
-        let historyItem = TranscriptionHistoryItem(text: text, duration: duration)
+        let historyItem = TranscriptionHistoryItem(text: text, duration: duration, segments: segments, sourceMediaData: sourceMediaData)
         
         // Add to beginning of array
         transcriptionHistory.insert(historyItem, at: 0)
@@ -84,6 +84,9 @@ class TranscriptionHistoryManager: ObservableObject {
         }
         
         saveHistory()
+        
+        // Broadcast to Webhooks if enabled
+        WebhookManager.shared.sendTranscript(text: text, duration: duration)
         
         // Update stats (Calculated independently of the array bounds)
         let words = text.split { $0.isWhitespace || $0.isNewline }.count
@@ -102,6 +105,16 @@ class TranscriptionHistoryManager: ObservableObject {
         }
         
         print("📝 Added transcription to history: \(text.prefix(50))...")
+    }
+    
+    // MARK: - Update Item
+    
+    func updateTranscription(_ updatedItem: TranscriptionHistoryItem) {
+        if let index = transcriptionHistory.firstIndex(where: { $0.id == updatedItem.id }) {
+            transcriptionHistory[index] = updatedItem
+            saveHistory()
+            print("✏️ Updated transcription item: \(updatedItem.id)")
+        }
     }
     
     // MARK: - Bulk Deletion

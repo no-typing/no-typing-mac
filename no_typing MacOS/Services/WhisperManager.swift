@@ -87,10 +87,14 @@ struct WhisperModelInfo: Identifiable {
 }
 
 /// Represents a timestamped segment from Whisper transcription
-struct WhisperTranscriptionSegment {
+struct WhisperTranscriptionSegment: Codable, Identifiable {
+    var id: UUID = UUID()
     let startTime: TimeInterval
     let endTime: TimeInterval
-    let text: String
+    var text: String
+    var translatedText: String? = nil
+    var speaker: String? = nil
+    var isStarred: Bool? = false
     
     var duration: TimeInterval {
         return endTime - startTime
@@ -161,6 +165,20 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             icon: "sparkles",
             description: "Fastest large model. Perfect for English language only.",
             recommendation: "Fastest for English-only transcription"
+        ),
+        "parakeet_v2": ModelDisplayInfo(
+            id: "parakeet_v2",
+            displayName: "Parakeet v2",
+            icon: "bird",
+            description: "NVIDIA's 0.6B param Fast Conformer TDT model. English-only, up to 300x realtime on Apple Silicon.",
+            recommendation: "Fastest English transcription (M-series required)"
+        ),
+        "parakeet_v3": ModelDisplayInfo(
+            id: "parakeet_v3",
+            displayName: "Parakeet v3",
+            icon: "bird.fill",
+            description: "NVIDIA's multilingual 0.6B param model. Supports 25 European languages with auto-detection.",
+            recommendation: "Fastest multilingual (M-series required)"
         )
     ]
 
@@ -210,7 +228,9 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             ("small", "ggml-small.bin"),
             ("large_v3", "ggml-large-v3.bin"),
             ("large_v3_turbo", "ggml-large-v3-turbo.bin"),
-            ("distil_large_v3.5", "ggml-distil-large-v3.5.bin")
+            ("distil_large_v3.5", "ggml-distil-large-v3.5.bin"),
+            ("parakeet_v2", "parakeet-tdt-0.6b-v2.onnx"),
+            ("parakeet_v3", "parakeet-tdt-0.6b-v3.onnx")
         ]
 
         var modelsInfo: [WhisperModelInfo] = []
@@ -293,6 +313,12 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         case "distil_large_v3.5":
             fileName = "ggml-distil-large-v3.5.bin"
             urlString = "https://huggingface.co/distil-whisper/distil-large-v3.5-ggml/resolve/main/ggml-model.bin"
+        case "parakeet_v2":
+            fileName = "parakeet-tdt-0.6b-v2.onnx"
+            urlString = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v2-onnx/resolve/main/model.onnx"
+        case "parakeet_v3":
+            fileName = "parakeet-tdt-0.6b-v3.onnx"
+            urlString = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/model.onnx"
         case "large_v3_turbo", "largev3turbo":
             fallthrough
         default:
@@ -523,7 +549,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         }
     }
 
-    func transcribe(audioURL: URL, mode: RecordingMode, targetLanguage: String? = nil, completion: @escaping (Result<String, Error>) -> Void) {
+    func transcribe(audioURL: URL, mode: RecordingMode, targetLanguage: String? = nil, translateToEnglish: Bool = false, completion: @escaping (Result<String, Error>) -> Void) {
         // Update last use time
         lastModelUseTime = Date()
         
@@ -577,10 +603,14 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 "-of", outputFile.path,
                 audioURL.path
             ]
-
+            
             switch mode {
             case .transcriptionOnly:
-                arguments += ["--language", targetLanguage ?? "auto"]
+                if translateToEnglish {
+                    arguments += ["-tr"]
+                } else {
+                    arguments += ["--language", targetLanguage ?? "auto"]
+                }
             // case .meetingTranscription has been removed - all transcriptions use the same settings
             }
 
@@ -629,12 +659,17 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 try? FileManager.default.removeItem(at: tempDir)
 
                 // Filter and process the transcription
+                let ignoreSilence = UserDefaults.standard.bool(forKey: "ignoreSilenceSegments")
                 let filteredTranscription = transcription
                     .components(separatedBy: .newlines)
                     .map { line -> String in
-                        line.replacingOccurrences(of: "\\[.*?\\]|\\(.*?\\)|♪.*?♪", with: "", options: .regularExpression)
-                            .replacingOccurrences(of: "♪", with: "")
-                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        if ignoreSilence {
+                            return line.replacingOccurrences(of: "\\[.*?\\]|\\(.*?\\)|♪.*?♪", with: "", options: .regularExpression)
+                                .replacingOccurrences(of: "♪", with: "")
+                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                        } else {
+                            return line.trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
                     }
                     .filter { !$0.isEmpty }
                     .joined(separator: " ")
@@ -654,7 +689,13 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
     
     /// Transcribe audio with timestamps for meeting mode
-    func transcribeWithTimestamps(audioURL: URL, recordingStartTime: Date, targetLanguage: String? = nil, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
+    func transcribeWithTimestamps(audioURL: URL, recordingStartTime: Date, targetLanguage: String? = nil, translateToEnglish: Bool = false, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
+        // Route Parakeet models through ParakeetManager
+        if ParakeetManager.isParakeetModel(selectedModelSize) {
+            ParakeetManager.shared.transcribe(audioURL: audioURL, modelId: selectedModelSize, completion: completion)
+            return
+        }
+        
         // Update last use time
         lastModelUseTime = Date()
         
@@ -697,13 +738,19 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             process.standardError = outputPipe
 
             // Configure arguments for timestamped output (SRT format for easy parsing)
-            let arguments = [
+            var arguments = [
                 "-m", modelURL.path,
                 "-osrt",  // Output SRT format for timestamps
-                "-of", outputFile.path,
-                "--language", targetLanguage ?? "auto",
-                audioURL.path
+                "-of", outputFile.path
             ]
+            
+            if translateToEnglish {
+                arguments += ["-tr"]
+            } else {
+                arguments += ["--language", targetLanguage ?? "auto"]
+            }
+            
+            arguments += [audioURL.path]
 
             process.arguments = arguments
             process.currentDirectoryURL = tempDir
@@ -859,6 +906,9 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     
     /// Clean transcription text by removing unwanted patterns
     private func cleanTranscriptionText(_ text: String) -> String {
+        let ignoreSilence = UserDefaults.standard.bool(forKey: "ignoreSilenceSegments")
+        guard ignoreSilence else { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
+        
         return text
             .replacingOccurrences(of: "\\[.*?\\]|\\(.*?\\)|♪.*?♪", with: "", options: .regularExpression)
             .replacingOccurrences(of: "♪", with: "")

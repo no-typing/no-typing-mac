@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum TranscribeMode {
-    case local, url
+    case local, url, podcast
 }
 
 struct SocialIcon: View {
@@ -115,6 +115,7 @@ struct TranscribeFileView: View {
     @State private var metadata: YTDLPMetadata? = nil
     @State private var isFetchingMetadata: Bool = false
     @State private var urlErrorMessage: String? = nil
+    @State private var podcastTracks: [URL] = []
     
     var body: some View {
 // ... existing UI ...
@@ -158,6 +159,28 @@ struct TranscribeFileView: View {
                             .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
+                    
+                    Button(action: { 
+                        withAnimation { transcribeMode = .podcast }
+                    }) {
+                        HStack(spacing: 4) {
+                            Text("Podcast")
+                                .font(.system(size: 13, weight: transcribeMode == .podcast ? .semibold : .medium))
+                                .foregroundColor(transcribeMode == .podcast ? .white : .white.opacity(0.6))
+                            Text("BETA")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(Color.orange)
+                                .cornerRadius(3)
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 16)
+                        .background(transcribeMode == .podcast ? ThemeColors.accent : Color.clear)
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(4)
                 .background(Color.black.opacity(0.3))
@@ -166,9 +189,55 @@ struct TranscribeFileView: View {
             }
             .padding(.bottom, 8)
             
+            // Translate Settings
+            Toggle(isOn: $manager.translateToEnglish) {
+                HStack(spacing: 6) {
+                    Image(systemName: "globe")
+                    Text("Translate to English")
+                }
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(manager.translateToEnglish ? .white : ThemeColors.secondaryText)
+            }
+            .toggleStyle(.checkbox)
+            .padding(.bottom, 8)
+            
+            // Transcription Engine
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Image(systemName: manager.useCloudEngine ? "cloud.fill" : "desktopcomputer")
+                        .font(.system(size: 14))
+                        .foregroundColor(manager.useCloudEngine ? .cyan : ThemeColors.accent)
+                    
+                    Toggle(isOn: $manager.useCloudEngine) {
+                        Text(manager.useCloudEngine ? "Cloud Transcription" : "Local Transcription (Whisper.cpp)")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(.cyan)
+                }
+                
+                if manager.useCloudEngine {
+                    Picker("Provider", selection: $manager.cloudProvider) {
+                        ForEach(CloudTranscriptionProvider.allCases) { provider in
+                            Text(provider.rawValue).tag(provider)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+            }
+            .padding(12)
+            .background(Color.black.opacity(0.2))
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05)))
+            .padding(.bottom, 8)
+            
             // Input Mode Views
             if transcribeMode == .url {
                 urlLinkView
+            } else if transcribeMode == .podcast {
+                podcastView
             } else {
                 localFileView
             }
@@ -186,6 +255,108 @@ struct TranscribeFileView: View {
             } else {
                 Spacer()
             }
+        }
+    }
+    
+    // MARK: - Podcast View
+    private var podcastView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "waveform.badge.mic")
+                        .font(.system(size: 16))
+                        .foregroundColor(.orange)
+                    Text("Podcast Multi-Track")
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(.white)
+                    Text("BETA")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.orange)
+                        .cornerRadius(4)
+                }
+                Text("Select one audio file per host/speaker. Tracks will be combined and transcribed together.")
+                    .font(.caption)
+                    .foregroundColor(ThemeColors.secondaryText)
+            }
+            
+            // Track List
+            ForEach(Array(podcastTracks.enumerated()), id: \.offset) { index, url in
+                HStack {
+                    Image(systemName: "person.circle.fill")
+                        .foregroundColor(.cyan)
+                    Text("Host \(index + 1): ")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.white)
+                    Text(url.lastPathComponent)
+                        .font(.caption)
+                        .foregroundColor(ThemeColors.secondaryText)
+                        .lineLimit(1)
+                    Spacer()
+                    Button(action: { podcastTracks.remove(at: index) }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.red.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(8)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(6)
+            }
+            
+            HStack(spacing: 12) {
+                Button(action: selectPodcastTrack) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add Host Track")
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                
+                if podcastTracks.count >= 2 {
+                    Button(action: {
+                        PodcastTrackCombiner.shared.combineAndTranscribe(trackURLs: podcastTracks)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "waveform.path")
+                            Text("Combine & Transcribe")
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(ThemeColors.accent)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(manager.isTranscribing)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.black.opacity(0.2))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.2), lineWidth: 1))
+    }
+    
+    private func selectPodcastTrack() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedFileTypes = ["mp3", "wav", "m4a", "ogg", "opus", "flac", "aac"]
+        panel.title = "Select Host Audio Track"
+        panel.message = "Choose the audio recording for a single podcast host."
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            podcastTracks.append(url)
         }
     }
     
@@ -209,9 +380,24 @@ struct TranscribeFileView: View {
                         .foregroundColor(isHoveringUpload && !manager.isTranscribing ? ThemeColors.accent : .white.opacity(0.5))
                         .symbolEffect(.pulse, options: .repeating, isActive: manager.isTranscribing)
                     
-                    Text(manager.isTranscribing ? "Transcribing \(manager.currentFileName ?? "File")..." : "Click to select an audio file")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.white)
+                    if manager.isTranscribing {
+                        let total = manager.totalInBatch
+                        let remaining = manager.transcriptionQueue.count
+                        let current = total - remaining
+                        Text("Transcribing \(current) of \(total)...")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white)
+                        
+                        Text(manager.currentFileName ?? "File")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundColor(ThemeColors.secondaryText)
+                            .lineLimit(1)
+                            .padding(.horizontal, 20)
+                    } else {
+                        Text("Click to select audio/video files")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white)
+                    }
                     
                     if manager.isTranscribing {
                         ProgressView()
@@ -233,16 +419,25 @@ struct TranscribeFileView: View {
         .onDrop(of: [.fileURL], isTargeted: $isHoveringUpload) { providers in
             guard !manager.isTranscribing else { return false }
             
-            guard let provider = providers.first else { return false }
+            var droppedURLs: [URL] = []
+            let group = DispatchGroup()
             
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
-                guard let data = item as? Data,
-                      let url = URL(dataRepresentation: data, relativeTo: nil) else {
-                    return
+            for provider in providers {
+                group.enter()
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
+                    defer { group.leave() }
+                    
+                    guard let data = item as? Data,
+                          let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                        return
+                    }
+                    droppedURLs.append(url)
                 }
-                
-                DispatchQueue.main.async {
-                    self.manager.transcribeFile(url: url)
+            }
+            
+            group.notify(queue: .main) {
+                if !droppedURLs.isEmpty {
+                    self.manager.queueFiles(droppedURLs)
                 }
             }
             
@@ -467,11 +662,14 @@ struct TranscribeFileView: View {
             UTType.audio, UTType.mpeg4Audio, UTType.wav, UTType.mp3,
             UTType.movie, UTType.mpeg4Movie, UTType.quickTimeMovie
         ]
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         
-        if panel.runModal() == .OK, let url = panel.url {
-            manager.transcribeFile(url: url)
+        if panel.runModal() == .OK {
+            let urls = panel.urls
+            if !urls.isEmpty {
+                manager.queueFiles(urls)
+            }
         }
     }
     

@@ -6,6 +6,7 @@ struct WhisperModelSelectionView: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("enableTranscriptionCleaning") private var enableTranscriptionCleaning = true
     @AppStorage("enableAutoPunctuation") private var enableAutoPunctuation = true
+    @AppStorage("ignoreSilenceSegments") private var ignoreSilenceSegments = true
     @AppStorage("pauseDetectionThreshold") private var pauseDetectionThreshold: Double = 1.5
     var showTitle: Bool = true
     var showDescription: Bool = true
@@ -111,6 +112,10 @@ struct WhisperModelSelectionView: View {
             return LinearGradient(colors: [.blue, .teal], startPoint: .topLeading, endPoint: .bottomTrailing)
         case "distil_large_v3.5":
             return LinearGradient(colors: [.pink, .red], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case "parakeet_v2":
+            return LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case "parakeet_v3":
+            return LinearGradient(colors: [.green, .teal], startPoint: .topLeading, endPoint: .bottomTrailing)
         default:
             return LinearGradient(colors: [.gray], startPoint: .top, endPoint: .bottom)
         }
@@ -122,6 +127,8 @@ struct WhisperModelSelectionView: View {
         case "large_v3", "largev3": return .orange
         case "large_v3_turbo", "largev3turbo": return .blue
         case "distil_large_v3.5": return .pink
+        case "parakeet_v2": return .green
+        case "parakeet_v3": return .teal
         default: return .gray
         }
     }
@@ -442,6 +449,24 @@ struct WhisperModelSelectionView: View {
                             )
                             
                             Text("Automatically adds a period at the end of your transcriptions")
+                                .font(.subheadline)
+                                .foregroundColor(ThemeColors.secondaryText)
+                                .padding(.leading, 12)
+                        }
+                        
+                        Divider()
+                            .padding(.vertical, 8)
+                        
+                        // Ignore Sound Tags Toggle
+                        VStack(alignment: .leading, spacing: 8) {
+                            SettingsToggleRow(
+                                icon: "speaker.slash",
+                                title: "Ignore Sound Tags",
+                                isOn: $ignoreSilenceSegments,
+                                iconGradient: LinearGradient(colors: [.gray, .black.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            
+                            Text("Automatically removes tags like [SILENCE] or [MUSIC] from transcripts")
                                 .font(.subheadline)
                                 .foregroundColor(ThemeColors.secondaryText)
                                 .padding(.leading, 12)

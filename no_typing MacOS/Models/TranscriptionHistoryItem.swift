@@ -2,15 +2,23 @@ import Foundation
 
 struct TranscriptionHistoryItem: Codable, Identifiable {
     let id: UUID
-    let text: String
-    let timestamp: Date
-    let duration: TimeInterval?
+    var text: String
+    var timestamp: Date
+    var duration: TimeInterval?
+    var segments: [WhisperTranscriptionSegment]?
+    var wordCount: Int? = 0
+    var timeOffset: TimeInterval? = 0
+    var sourceMediaData: Data? = nil
     
-    init(text: String, timestamp: Date = Date(), duration: TimeInterval? = nil) {
+    init(text: String, timestamp: Date = Date(), duration: TimeInterval? = nil, segments: [WhisperTranscriptionSegment]? = nil, wordCount: Int? = nil, timeOffset: TimeInterval? = 0, sourceMediaData: Data? = nil) {
         self.id = UUID()
         self.text = text
         self.timestamp = timestamp
         self.duration = duration
+        self.segments = segments
+        self.wordCount = wordCount ?? text.split { $0.isWhitespace || $0.isPunctuation }.count
+        self.timeOffset = timeOffset
+        self.sourceMediaData = sourceMediaData
     }
     
     var formattedDate: String {

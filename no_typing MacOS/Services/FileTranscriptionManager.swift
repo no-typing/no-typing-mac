@@ -11,15 +11,49 @@ class FileTranscriptionManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var currentFileName: String?
     
+    @Published var transcriptionQueue: [URL] = []
+    @Published var totalInBatch: Int = 0
+    @Published var translateToEnglish: Bool = false
+    
+    @Published var useCloudEngine: Bool = false
+    @Published var cloudProvider: CloudTranscriptionProvider = .deepgram
+    
     private init() {}
     
+    func queueFiles(_ urls: [URL]) {
+        transcriptionQueue.append(contentsOf: urls)
+        if totalInBatch == 0 {
+            totalInBatch = urls.count
+        } else {
+            totalInBatch += urls.count
+        }
+        
+        processNextIfAvailable()
+    }
+    
+    private func processNextIfAvailable() {
+        guard !isTranscribing else { return }
+        
+        guard !transcriptionQueue.isEmpty else {
+            // Batch is completely finished
+            totalInBatch = 0
+            return
+        }
+        
+        let url = transcriptionQueue.removeFirst()
+        transcribeFile(url: url)
+    }
+
     func transcribeFile(url: URL) {
         guard !isTranscribing else { return }
         
+        if useCloudEngine {
+            transcribeFileCloud(url: url)
+            return
+        }
+        
         isTranscribing = true
         errorMessage = nil
-        transcribedText = ""
-        wordCount = 0
         currentFileName = url.lastPathComponent
         
         NotificationManager.shared.requestAuthorization()
@@ -29,7 +63,12 @@ class FileTranscriptionManager: ObservableObject {
         convertTo16kHzWav(sourceURL: url) { [weak self] conversionResult in
             switch conversionResult {
             case .success(let wavURL):
-                WhisperManager.shared.transcribe(audioURL: wavURL, mode: .transcriptionOnly) { result in
+                WhisperManager.shared.transcribeWithTimestamps(
+                    audioURL: wavURL,
+                    recordingStartTime: Date(),
+                    targetLanguage: nil,
+                    translateToEnglish: self?.translateToEnglish ?? false
+                ) { result in
                     DispatchQueue.main.async {
                         self?.isTranscribing = false
                         self?.currentFileName = nil
@@ -38,17 +77,35 @@ class FileTranscriptionManager: ObservableObject {
                         try? FileManager.default.removeItem(at: wavURL)
                         
                         switch result {
-                        case .success(let text):
-                            let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                            let formattedText = self?.formatTranscriptionAsParagraphs(cleanedText) ?? cleanedText
+                        case .success(let segments):
+                            let rawText = segments.map { $0.text }.joined(separator: " ")
+                            let cleanedText = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            // let formattedText = self?.formatTranscriptionAsParagraphs(cleanedText) ?? cleanedText
+                            let formattedText = cleanedText
                             self?.transcribedText = formattedText
                             
                             // Calculate word count
                             let words = formattedText.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
                             self?.wordCount = words.count
                             
+                            var bookmarkData: Data? = nil
+                            do {
+                                let isSecurityScoped = url.startAccessingSecurityScopedResource()
+                                bookmarkData = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                                if isSecurityScoped {
+                                    url.stopAccessingSecurityScopedResource()
+                                }
+                            } catch {
+                                print("Warning: Failed to create security-scoped bookmark for media: \(error.localizedDescription)")
+                            }
+                            
                             if !formattedText.isEmpty {
-                                TranscriptionHistoryManager.shared.addTranscription(formattedText, duration: duration)
+                                TranscriptionHistoryManager.shared.addTranscription(
+                                    formattedText,
+                                    duration: duration,
+                                    segments: segments,
+                                    sourceMediaData: bookmarkData
+                                )
                             }
                             
                             NotificationManager.shared.sendNotification(
@@ -63,6 +120,9 @@ class FileTranscriptionManager: ObservableObject {
                                 body: "Error: \(error.localizedDescription)"
                             )
                         }
+                        
+                        // Move to next file in queue
+                        self?.processNextIfAvailable()
                     }
                 }
             case .failure(let error):
@@ -74,6 +134,75 @@ class FileTranscriptionManager: ObservableObject {
                         title: "Format Conversion Failed",
                         body: "Could not read audio file: \(error.localizedDescription)"
                     )
+                    
+                    self?.processNextIfAvailable()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Cloud Transcription
+    private func transcribeFileCloud(url: URL) {
+        isTranscribing = true
+        errorMessage = nil
+        currentFileName = url.lastPathComponent
+        
+        NotificationManager.shared.requestAuthorization()
+        let duration = getAudioDuration(url: url)
+        let provider = cloudProvider
+        
+        Task {
+            do {
+                let segments = try await CloudTranscriptionManager.shared.transcribe(audioURL: url, provider: provider)
+                
+                await MainActor.run {
+                    let rawText = segments.map { $0.text }.joined(separator: " ")
+                    let cleanedText = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let formattedText = cleanedText
+                    self.transcribedText = formattedText
+                    
+                    let words = formattedText.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+                    self.wordCount = words.count
+                    
+                    var bookmarkData: Data? = nil
+                    do {
+                        let isSecurityScoped = url.startAccessingSecurityScopedResource()
+                        bookmarkData = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                        if isSecurityScoped {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    } catch {
+                        print("Warning: Failed to create security-scoped bookmark for media: \(error.localizedDescription)")
+                    }
+                    
+                    if !formattedText.isEmpty {
+                        TranscriptionHistoryManager.shared.addTranscription(
+                            formattedText,
+                            duration: duration,
+                            segments: segments,
+                            sourceMediaData: bookmarkData
+                        )
+                    }
+                    
+                    NotificationManager.shared.sendNotification(
+                        title: "Cloud Transcription Completed",
+                        body: "Transcribed via \(provider.rawValue)"
+                    )
+                    
+                    self.isTranscribing = false
+                    self.currentFileName = nil
+                    self.processNextIfAvailable()
+                }
+            } catch {
+                await MainActor.run {
+                    self.isTranscribing = false
+                    self.currentFileName = nil
+                    self.errorMessage = error.localizedDescription
+                    NotificationManager.shared.sendNotification(
+                        title: "Cloud Transcription Failed",
+                        body: error.localizedDescription
+                    )
+                    self.processNextIfAvailable()
                 }
             }
         }

@@ -4,5 +4,7 @@
 <dict>
     <key>NSAccessibilityUsageDescription</key>
     <string>No-Typing needs accessibility permission to read and write text in text fields of other applications.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>No-Typing needs screen recording permission to capture and transcribe system audio.</string>
 </dict>
 </plist>

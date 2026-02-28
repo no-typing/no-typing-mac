@@ -18,11 +18,38 @@ struct MagicActionsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Picker("", selection: $selectedTab) {
-                Text("Smart Snips").tag(0)
-                Text("Voice Commands").tag(1)
+            // Tab Toggle
+            HStack(spacing: 0) {
+                Button(action: {
+                    withAnimation { selectedTab = 0 }
+                }) {
+                    Text("Smart Snips")
+                        .font(.system(size: 13, weight: selectedTab == 0 ? .semibold : .medium))
+                        .foregroundColor(selectedTab == 0 ? .white : .white.opacity(0.6))
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 16)
+                        .background(selectedTab == 0 ? ThemeColors.accent : Color.clear)
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: {
+                    withAnimation { selectedTab = 1 }
+                }) {
+                    Text("Voice Commands")
+                        .font(.system(size: 13, weight: selectedTab == 1 ? .semibold : .medium))
+                        .foregroundColor(selectedTab == 1 ? .white : .white.opacity(0.6))
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 16)
+                        .background(selectedTab == 1 ? ThemeColors.accent : Color.clear)
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
             }
-            .pickerStyle(.segmented)
+            .padding(4)
+            .background(Color.black.opacity(0.3))
+            .cornerRadius(8)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.05)))
             .padding(.bottom, 8)
             
             if selectedTab == 0 {

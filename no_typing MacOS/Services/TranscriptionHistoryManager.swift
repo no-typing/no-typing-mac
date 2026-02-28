@@ -86,7 +86,10 @@ class TranscriptionHistoryManager: ObservableObject {
         saveHistory()
         
         // Broadcast to Webhooks if enabled
-        WebhookManager.shared.sendTranscript(text: text, duration: duration)
+        if let idString = UserDefaults.standard.string(forKey: "voiceWebhookEndpointId"),
+           let endpointId = UUID(uuidString: idString) {
+            WebhookManager.shared.sendTranscript(text: text, duration: duration, endpointId: endpointId)
+        }
         
         // Update stats (Calculated independently of the array bounds)
         let words = text.split { $0.isWhitespace || $0.isNewline }.count

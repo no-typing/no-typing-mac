@@ -266,7 +266,7 @@ struct UnifiedSettingsView: View {
     
     // MARK: - Model Settings Section
     private var modelSettingsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        LazyVStack(alignment: .leading, spacing: 16) {
             // Section Header
             Text("Model Settings")
                 .font(.system(size: 28, weight: .bold))

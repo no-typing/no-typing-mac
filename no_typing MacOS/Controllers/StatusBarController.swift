@@ -73,82 +73,58 @@ class StatusBarController: NSObject, ObservableObject {
         if let event = NSApp.currentEvent, event.type == .rightMouseUp {
             // Show context menu on right-click
             showContextMenu()
-        } else {
-            // Left-click - open settings
-            Task { @MainActor in
-                // Check if settings window already exists
-                if let existingWindow = settingsWindow {
-                    // Window exists, bring it to front
-                    existingWindow.makeKeyAndOrderFront(nil)
-                    existingWindow.orderFrontRegardless()
-                    
-                    // If window is minimized, deminiaturize it
-                    if existingWindow.isMiniaturized {
-                        existingWindow.deminiaturize(nil)
-                    }
-                    
-                    // Ensure window is visible
-                    if !existingWindow.isVisible {
-                        existingWindow.orderFront(nil)
-                    }
-                    
-                    // Show in dock
-                    NSApp.setActivationPolicy(.regular)
-                    
-                    // Force app activation with more aggressive settings
-                    NSApp.activate(ignoringOtherApps: true)
-                    NSApp.arrangeInFront(nil)
-                    existingWindow.level = .floating
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        existingWindow.level = .normal
-                    }
-                    
-                    return
-                }
-                
-                // Create new window only if it doesn't exist
-                let windowManager = WindowManager()
-                let contentView = ContentView()
-                    .environmentObject(windowManager)
-                    .environmentObject(self.audioManager)
-                let hostingController = NSHostingController(rootView: contentView)
-                let window = NSWindow(contentViewController: hostingController)
-                window.title = ""
-                window.setContentSize(NSSize(width: 1000, height: 700))
-                window.minSize = NSSize(width: 800, height: 500)
-                window.center()
-                
-                // Configure window style
-                window.backgroundColor = NSColor.windowBackgroundColor
-                window.titlebarAppearsTransparent = true
-                window.titleVisibility = .hidden
-                
-                // Set delegate to handle window closing
-                window.delegate = self
-                
-                // Store reference to the window
-                settingsWindow = window
-                
-                // Create window controller to keep window alive
-                let windowController = NSWindowController(window: window)
-                settingsWindowController = windowController
-                
-                // Show in dock
-                NSApp.setActivationPolicy(.regular)
-                
-                windowController.showWindow(nil)
-                window.makeKeyAndOrderFront(nil)
-                window.orderFrontRegardless()
-                NSApp.activate(ignoringOtherApps: true)
-                NSApp.arrangeInFront(nil)
-                
-                // Temporarily set floating level to ensure it comes to front
-                window.level = .floating
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    window.level = .normal
-                }
-            }
+            return
         }
+        
+        // Left-click - open settings
+        // IMPORTANT: Activate app synchronously before any async work.
+        // If deferred (e.g. via Task), the status bar click event completes first
+        // and macOS deactivates the app, causing the window to flash and disappear.
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Check if settings window already exists
+        if let existingWindow = settingsWindow {
+            // If window is minimized, deminiaturize it
+            if existingWindow.isMiniaturized {
+                existingWindow.deminiaturize(nil)
+            }
+            
+            existingWindow.makeKeyAndOrderFront(nil)
+            existingWindow.orderFrontRegardless()
+            return
+        }
+        
+        // Create new window only if it doesn't exist
+        let windowManager = WindowManager()
+        let contentView = ContentView()
+            .environmentObject(windowManager)
+            .environmentObject(self.audioManager)
+        let hostingController = NSHostingController(rootView: contentView)
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = ""
+        window.setContentSize(NSSize(width: 1000, height: 700))
+        window.minSize = NSSize(width: 800, height: 500)
+        window.center()
+        
+        // Configure window style
+        window.backgroundColor = NSColor.windowBackgroundColor
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        
+        // Set delegate to handle window closing
+        window.delegate = self
+        
+        // Store reference to the window
+        settingsWindow = window
+        
+        // Create window controller to keep window alive
+        let windowController = NSWindowController(window: window)
+        settingsWindowController = windowController
+        
+        windowController.showWindow(nil)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
     
     private func showContextMenu() {

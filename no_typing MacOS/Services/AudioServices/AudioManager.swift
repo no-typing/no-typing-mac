@@ -14,6 +14,7 @@ enum RecordingMode {
 enum AudioInputSource: String, CaseIterable, Identifiable {
     case microphone = "Microphone"
     case systemAudio = "System Audio"
+    case micAndSystem = "Mic + System Audio"
     var id: String { self.rawValue }
 }
 
@@ -392,7 +393,7 @@ class AudioManager: ObservableObject {
                     }
                 }
             }
-        } else if inputSource == .systemAudio {
+        } else if inputSource == .systemAudio || inputSource == .micAndSystem {
             systemAudioService.requestPermission()
             if systemAudioService.hasPermission {
                 DispatchQueue.main.async {
@@ -630,17 +631,18 @@ class AudioManager: ObservableObject {
     
     private func setupSystemAudioForRecording() {
         print("AudioManager: Setting up system audio for recording via SCK")
+        let includeMic = (inputSource == .micAndSystem)
         
         // Add a minimum delay to ensure loading animation is visible
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.checkSystemAudioReadyAndStartRecording()
+            self?.checkSystemAudioReadyAndStartRecording(includeMicrophone: includeMic)
         }
     }
     
-    private func checkSystemAudioReadyAndStartRecording(attempts: Int = 0) {
+    private func checkSystemAudioReadyAndStartRecording(includeMicrophone: Bool = false, attempts: Int = 0) {
         Task { @MainActor in
             do {
-                try await systemAudioService.startRecording()
+                try await systemAudioService.startRecording(includeMicrophone: includeMicrophone)
                 
                 print("AudioManager: System audio capture started successfully")
                 

@@ -50,6 +50,40 @@ class ParakeetManager {
         return FileManager.default.fileExists(atPath: modelFilePath(for: modelId).path)
     }
     
+    /// Check if Python 3 and required packages are available
+    func checkPrerequisites() -> (ready: Bool, message: String) {
+        // Check for Python 3
+        let pythonPaths = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/usr/bin/python3"]
+        guard let pythonPath = pythonPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
+            return (false, "Python 3 is required. Install via: brew install python3")
+        }
+        
+        // Check for onnx_asr package
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: pythonPath)
+        process.arguments = ["-c", "import onnx_asr"]
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            if process.terminationStatus != 0 {
+                return (false, "Required Python package missing. Install via: pip3 install onnx_asr")
+            }
+        } catch {
+            return (false, "Failed to verify Python packages: \(error.localizedDescription)")
+        }
+        
+        return (true, "Ready")
+    }
+    
+    /// Returns a human-readable requirements string for the UI
+    static var requirementsDescription: String {
+        return "Requires: Python 3 + pip3 install onnx_asr"
+    }
+    
     /// Run Parakeet inference on an audio file using onnx-asr Python package
     func transcribe(audioURL: URL, modelId: String, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
         let modelPath = modelFilePath(for: modelId)

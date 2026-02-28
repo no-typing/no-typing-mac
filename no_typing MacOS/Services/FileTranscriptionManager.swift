@@ -106,6 +106,12 @@ class FileTranscriptionManager: ObservableObject {
                                     segments: segments,
                                     sourceMediaData: bookmarkData
                                 )
+                                
+                                // Forward to file transcription webhook if configured
+                                if let idString = UserDefaults.standard.string(forKey: "fileTranscriptionWebhookEndpointId"),
+                                   let endpointId = UUID(uuidString: idString) {
+                                    WebhookManager.shared.sendTranscript(text: formattedText, duration: duration, endpointId: endpointId)
+                                }
                             }
                             
                             NotificationManager.shared.sendNotification(
@@ -182,6 +188,12 @@ class FileTranscriptionManager: ObservableObject {
                             segments: segments,
                             sourceMediaData: bookmarkData
                         )
+                        
+                        // Forward to file transcription webhook if configured
+                        if let idString = UserDefaults.standard.string(forKey: "fileTranscriptionWebhookEndpointId"),
+                           let endpointId = UUID(uuidString: idString) {
+                            WebhookManager.shared.sendTranscript(text: formattedText, duration: duration, endpointId: endpointId)
+                        }
                     }
                     
                     NotificationManager.shared.sendNotification(

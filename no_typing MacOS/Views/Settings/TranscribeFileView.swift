@@ -105,6 +105,8 @@ struct CopyPastingTextField: NSViewRepresentable {
 struct TranscribeFileView: View {
     @StateObject private var manager = FileTranscriptionManager.shared
     @StateObject private var ytdlpManager = YTDLPManager.shared
+    @StateObject private var webhookManager = WebhookManager.shared
+    @State private var fileWebhookEndpointId: String = UserDefaults.standard.string(forKey: "fileTranscriptionWebhookEndpointId") ?? ""
     
     @State private var isHoveringUpload = false
     @State private var hoveredCopied = false
@@ -201,31 +203,73 @@ struct TranscribeFileView: View {
             .toggleStyle(.checkbox)
             .padding(.bottom, 8)
             
-            // Transcription Engine
+            // Transcription Service
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     Image(systemName: manager.useCloudEngine ? "cloud.fill" : "desktopcomputer")
                         .font(.system(size: 14))
                         .foregroundColor(manager.useCloudEngine ? .cyan : ThemeColors.accent)
-                    
-                    Toggle(isOn: $manager.useCloudEngine) {
-                        Text(manager.useCloudEngine ? "Cloud Transcription" : "Local Transcription (Whisper.cpp)")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white)
-                    }
-                    .toggleStyle(.switch)
-                    .tint(.cyan)
-                }
-                
-                if manager.useCloudEngine {
-                    Picker("Provider", selection: $manager.cloudProvider) {
+                    Text("Transcription Service")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Picker("Service", selection: Binding(
+                        get: {
+                            manager.useCloudEngine ? manager.cloudProvider.rawValue : "local"
+                        },
+                        set: { newValue in
+                            if newValue == "local" {
+                                manager.useCloudEngine = false
+                            } else {
+                                manager.useCloudEngine = true
+                                if let provider = CloudTranscriptionProvider.allCases.first(where: { $0.rawValue == newValue }) {
+                                    manager.cloudProvider = provider
+                                }
+                            }
+                        }
+                    )) {
+                        Text("Local (Whisper.cpp)").tag("local")
+                        Divider()
                         ForEach(CloudTranscriptionProvider.allCases) { provider in
-                            Text(provider.rawValue).tag(provider)
+                            Text(provider.rawValue).tag(provider.rawValue)
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
+                    .frame(width: 220)
                 }
+            }
+            .padding(12)
+            .background(Color.black.opacity(0.2))
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05)))
+            .padding(.bottom, 8)
+            
+            // Webhook Endpoint Selection
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("Forward to Webhook")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Picker("Webhook", selection: Binding(
+                        get: { fileWebhookEndpointId },
+                        set: { newValue in
+                            fileWebhookEndpointId = newValue
+                            UserDefaults.standard.set(newValue, forKey: "fileTranscriptionWebhookEndpointId")
+                        }
+                    )) {
+                        Text("None").tag("")
+                        ForEach(webhookManager.endpoints) { endpoint in
+                            Text(endpoint.name).tag(endpoint.id.uuidString)
+                        }
+                    }
+                    .frame(width: 220)
+                }
+                Text("Only manually transcribed media is sent to this endpoint. Voice webhook can be found under App Settings.")
+                    .font(.system(size: 11))
+                    .foregroundColor(ThemeColors.secondaryText)
             }
             .padding(12)
             .background(Color.black.opacity(0.2))
@@ -342,6 +386,7 @@ struct TranscribeFileView: View {
             }
         }
         .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.black.opacity(0.2))
         .cornerRadius(12)
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.2), lineWidth: 1))

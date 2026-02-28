@@ -81,25 +81,107 @@ struct WhisperModelSelectionView: View {
         toneCategories.flatMap { $0.tones }
     }
     
-    // Define supported languages with Whisper's language codes
+    // Define supported languages with Whisper's language codes (all 99 supported languages)
     private let supportedLanguages: [(name: String, code: String)] = [
         ("Auto", "auto"),
-        ("English", "en"),
+        ("Afrikaans", "af"),
+        ("Amharic", "am"),
+        ("Arabic", "ar"),
+        ("Armenian", "hy"),
+        ("Assamese", "as"),
+        ("Azerbaijani", "az"),
+        ("Bashkir", "ba"),
+        ("Belarusian", "be"),
+        ("Bengali", "bn"),
+        ("Bosnian", "bs"),
+        ("Breton", "br"),
+        ("Bulgarian", "bg"),
+        ("Burmese", "my"),
+        ("Catalan", "ca"),
         ("Chinese", "zh"),
-        ("German", "de"),
-        ("Spanish", "es"),
-        ("Russian", "ru"),
-        ("Korean", "ko"),
-        ("French", "fr"),
-        ("Japanese", "ja"),
-        ("Portuguese", "pt"),
-        ("Turkish", "tr"),
-        ("Polish", "pl"),
-        ("Italian", "it"),
-        ("Vietnamese", "vi"),
+        ("Croatian", "hr"),
+        ("Czech", "cs"),
+        ("Danish", "da"),
         ("Dutch", "nl"),
+        ("English", "en"),
+        ("Estonian", "et"),
+        ("Faroese", "fo"),
+        ("Finnish", "fi"),
+        ("French", "fr"),
+        ("Galician", "gl"),
+        ("Georgian", "ka"),
+        ("German", "de"),
+        ("Greek", "el"),
+        ("Gujarati", "gu"),
+        ("Haitian Creole", "ht"),
+        ("Hausa", "ha"),
+        ("Hawaiian", "haw"),
+        ("Hebrew", "he"),
+        ("Hindi", "hi"),
+        ("Hungarian", "hu"),
+        ("Icelandic", "is"),
+        ("Indonesian", "id"),
+        ("Italian", "it"),
+        ("Japanese", "ja"),
+        ("Javanese", "jw"),
+        ("Kannada", "kn"),
+        ("Kazakh", "kk"),
+        ("Khmer", "km"),
+        ("Korean", "ko"),
+        ("Lao", "lo"),
+        ("Latin", "la"),
+        ("Latvian", "lv"),
+        ("Lingala", "ln"),
+        ("Lithuanian", "lt"),
+        ("Luxembourgish", "lb"),
+        ("Macedonian", "mk"),
+        ("Malagasy", "mg"),
+        ("Malay", "ms"),
+        ("Malayalam", "ml"),
+        ("Maltese", "mt"),
+        ("Maori", "mi"),
+        ("Marathi", "mr"),
+        ("Mongolian", "mn"),
+        ("Nepali", "ne"),
+        ("Norwegian", "no"),
+        ("Norwegian Nynorsk", "nn"),
+        ("Occitan", "oc"),
+        ("Pashto", "ps"),
         ("Persian", "fa"),
-        ("Arabic", "ar")
+        ("Polish", "pl"),
+        ("Portuguese", "pt"),
+        ("Punjabi", "pa"),
+        ("Romanian", "ro"),
+        ("Russian", "ru"),
+        ("Sanskrit", "sa"),
+        ("Serbian", "sr"),
+        ("Shona", "sn"),
+        ("Sindhi", "sd"),
+        ("Sinhala", "si"),
+        ("Slovak", "sk"),
+        ("Slovenian", "sl"),
+        ("Somali", "so"),
+        ("Spanish", "es"),
+        ("Sundanese", "su"),
+        ("Swahili", "sw"),
+        ("Swedish", "sv"),
+        ("Tagalog", "tl"),
+        ("Tajik", "tg"),
+        ("Tamil", "ta"),
+        ("Tatar", "tt"),
+        ("Telugu", "te"),
+        ("Thai", "th"),
+        ("Tibetan", "bo"),
+        ("Turkish", "tr"),
+        ("Turkmen", "tk"),
+        ("Ukrainian", "uk"),
+        ("Urdu", "ur"),
+        ("Uzbek", "uz"),
+        ("Vietnamese", "vi"),
+        ("Welsh", "cy"),
+        ("Yiddish", "yi"),
+        ("Yoruba", "yo"),
+        ("Zulu", "zu")
     ]
     
     private func getGradientForModel(_ id: String) -> LinearGradient {
@@ -173,8 +255,8 @@ struct WhisperModelSelectionView: View {
                                 .cornerRadius(12)
                             }
                             
-                            // Model Radio Cards
-                            HStack(alignment: .top, spacing: 12) {
+                            // Model Radio Cards - Flex Grid Layout
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], alignment: .leading, spacing: 12) {
                                 ForEach(whisperManager.availableModels, id: \.id) { model in
                                     let isSelected = model.id == whisperManager.selectedModelSize
                                     
@@ -186,16 +268,11 @@ struct WhisperModelSelectionView: View {
                                         }
                                     }) {
                                         VStack(alignment: .leading, spacing: 12) {
-                                            // Top Row: Icon and Status Indicator
+                                            // Top Row: Name and Status Indicator
                                             HStack(alignment: .top) {
-                                                ZStack {
-                                                    Circle()
-                                                        .fill(getGradientForModel(model.id))
-                                                        .frame(width: 36, height: 36)
-                                                    Image(systemName: model.displayInfo.icon)
-                                                        .foregroundColor(.white)
-                                                        .font(.system(size: 16))
-                                                }
+                                                Text(model.displayInfo.displayName)
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundColor(.white)
                                                 
                                                 Spacer()
                                                 
@@ -235,18 +312,12 @@ struct WhisperModelSelectionView: View {
                                                 }
                                             }
                                             
-                                            // Title and description (recommendation mapping to subtitle)
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(model.displayInfo.displayName)
-                                                    .font(.system(size: 15, weight: .semibold))
-                                                    .foregroundColor(.white)
-                                                
-                                                Text(model.displayInfo.recommendation ?? model.displayInfo.description)
-                                                    .font(.system(size: 12))
-                                                    .foregroundColor(ThemeColors.secondaryText)
-                                                    .lineLimit(3)
-                                                    .fixedSize(horizontal: false, vertical: true)
-                                            }
+                                            // Description
+                                            Text(model.displayInfo.recommendation ?? model.displayInfo.description)
+                                                .font(.system(size: 12))
+                                                .foregroundColor(ThemeColors.secondaryText)
+                                                .lineLimit(3)
+                                                .fixedSize(horizontal: false, vertical: true)
                                             
                                             Spacer(minLength: 0)
                                             
@@ -257,8 +328,16 @@ struct WhisperModelSelectionView: View {
                                                 .background(getPrimaryColorForModel(model.id).opacity(0.2))
                                                 .foregroundColor(getPrimaryColorForModel(model.id))
                                                 .cornerRadius(4)
+                                            
+                                            // Requirements badge for Parakeet models
+                                            if ParakeetManager.isParakeetModel(model.id) {
+                                                Text(ParakeetManager.requirementsDescription)
+                                                    .font(.system(size: 9))
+                                                    .foregroundColor(.orange.opacity(0.9))
+                                                    .padding(.top, 2)
+                                            }
                                                 
-                                            // Keep progress bar layout roughly the same scale but underneath
+                                            // Progress bar for downloading
                                             if !model.isAvailable && whisperManager.isDownloading && model.id == whisperManager.downloadingModelSize {
                                                 VStack(alignment: .leading, spacing: 4) {
                                                     GeometryReader { geometry in
@@ -292,7 +371,7 @@ struct WhisperModelSelectionView: View {
                                             }
                                         }
                                         .padding(14)
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                        .frame(minWidth: 160, maxHeight: .infinity, alignment: .topLeading)
                                         .background(
                                             RoundedRectangle(cornerRadius: 16, style: .continuous)
                                                 .fill(Color(red: 25/255, green: 30/255, blue: 40/255))
@@ -313,7 +392,8 @@ struct WhisperModelSelectionView: View {
                                 Text(errorMessage)
                                     .font(.subheadline)
                                     .foregroundColor(.red)
-                                    .lineLimit(2)
+                                    .lineLimit(4)
+                                    .textSelection(.enabled)
                             }
                         }
                         
@@ -338,26 +418,18 @@ struct WhisperModelSelectionView: View {
                                 Text("Recognition Language")
                                     .font(.body)
                                     .foregroundColor(.white)
+                                Spacer()
+                                Picker("Language", selection: $selectedLanguage) {
+                                    ForEach(supportedLanguages, id: \.code) { language in
+                                        Text(language.name).tag(language.code)
+                                    }
+                                }
+                                .frame(width: 200)
                             }
                             
                             Text("Select the primary language you'll be speaking in")
                                 .font(.subheadline)
                                 .foregroundColor(ThemeColors.secondaryText)
-                            
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
-                                ForEach(supportedLanguages, id: \.code) { language in
-                                    let isSelected = language.code == self.selectedLanguage
-                                    RadioGridCard(
-                                        title: language.name,
-                                        icon: nil,
-                                        iconGradient: nil,
-                                        isSelected: isSelected
-                                    ) {
-                                        self.selectedLanguage = language.code
-                                    }
-                                }
-                            }
-                            .padding(.top, 4)
                         }
                         .onChange(of: selectedLanguage) { newValue in
                             UserDefaults.standard.set(newValue, forKey: "selectedLanguage")

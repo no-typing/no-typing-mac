@@ -111,7 +111,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     @Published var isReady = false
     @Published var errorMessage: String?
     @Published var availableModels: [WhisperModelInfo] = []
-    @Published var selectedModelSize: String = "large_v3_turbo"  // Default model
+    @Published var selectedModelSize: String = "small"  // Default model
 
     // Process management
     private var processQueue = DispatchQueue(label: "com.no_typing.whisper.process", qos: .userInitiated)
@@ -143,7 +143,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             displayName: "Whisper Small",
             icon: "scope",
             description: "Higher accuracy with slightly longer processing time. Ideal when precision matters most.",
-            recommendation: "Accurate for English"
+            recommendation: "Light and Fast"
         ),
         "large_v3": ModelDisplayInfo(
             id: "large_v3",
@@ -214,7 +214,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             else { selectedModelSize = savedModel }
         } else {
             // Default to Large V3 Turbo
-            selectedModelSize = "large_v3_turbo"
+            selectedModelSize = "small"
         }
         
         // Save this to UserDefaults
@@ -286,7 +286,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             else if size == "largev3turbo" { selectedModelSize = "large_v3_turbo" }
             else { selectedModelSize = size }
         } else {
-            selectedModelSize = "large_v3_turbo"
+            selectedModelSize = "small"
         }
         UserDefaults.standard.setValue(selectedModelSize, forKey: "SelectedWhisperModel")
         
@@ -366,6 +366,17 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
     // Select a different Whisper model
     func selectModel(modelSize: String) {
+        // For Parakeet models, verify prerequisites first
+        if ParakeetManager.isParakeetModel(modelSize) {
+            let prereqResult = ParakeetManager.shared.checkPrerequisites()
+            if !prereqResult.ready {
+                DispatchQueue.main.async {
+                    self.errorMessage = prereqResult.message
+                }
+                return
+            }
+        }
+        
         // Use the provided model size
         selectedModelSize = modelSize
         UserDefaults.standard.setValue(selectedModelSize, forKey: "SelectedWhisperModel")
@@ -924,6 +935,23 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             // Use the explicitly tracked modelFileName if available, fallback to URL
             let destinationFileName = self.modelFileName ?? getFileName(for: downloadTask.originalRequest?.url)
             let destinationURL = getModelDirectory().appendingPathComponent(destinationFileName)
+            
+            // Validate downloaded file size (reject tiny files - likely error pages)
+            let downloadedAttributes = try fileManager.attributesOfItem(atPath: location.path)
+            let downloadedSize = downloadedAttributes[.size] as? UInt64 ?? 0
+            let minimumSize: UInt64 = 1_000_000 // 1MB minimum - real models are hundreds of MB
+            
+            if downloadedSize < minimumSize {
+                // Likely an HTML error page, not a real model
+                try? fileManager.removeItem(at: location)
+                DispatchQueue.main.async {
+                    self.errorMessage = "Download failed: received invalid file (\(ByteCountFormatter.string(fromByteCount: Int64(downloadedSize), countStyle: .file))). The model may not be available at this URL."
+                    self.isDownloading = false
+                    self.downloadingModelSize = nil
+                    self.downloadProgress = 0.0
+                }
+                return
+            }
 
             // Remove existing file if necessary
             if fileManager.fileExists(atPath: destinationURL.path) {
@@ -939,9 +967,19 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 self.downloadProgress = 1.0
                 self.isReady = true
                 
-                // Automatically select the newly downloaded model
+                // Automatically select the newly downloaded model (skip for Parakeet - needs prerequisite check)
                 if let modelSize = self.availableModels.first(where: { $0.fileName == destinationFileName })?.id {
-                    self.selectModel(modelSize: modelSize)
+                    if ParakeetManager.isParakeetModel(modelSize) {
+                        // Don't auto-select - just refresh the list. User must explicitly select.
+                        self.loadAvailableModels()
+                        
+                        let prereq = ParakeetManager.shared.checkPrerequisites()
+                        if !prereq.ready {
+                            self.errorMessage = "Parakeet model downloaded. To use it: \(prereq.message)"
+                        }
+                    } else {
+                        self.selectModel(modelSize: modelSize)
+                    }
                 }
                 
                 self.loadAvailableModels()  // Update available models

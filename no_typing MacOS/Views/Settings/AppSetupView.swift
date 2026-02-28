@@ -18,6 +18,8 @@ struct AppSetupView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var audioManager: AudioManager
     @StateObject private var watchFolderManager = WatchFolderManager.shared
+    @StateObject private var webhookManager = WebhookManager.shared
+    @State private var voiceWebhookEndpointId: String = UserDefaults.standard.string(forKey: "voiceWebhookEndpointId") ?? ""
     
     
     var body: some View {
@@ -31,20 +33,21 @@ struct AppSetupView: View {
                     Text("Audio Input Source")
                         .font(.title3)
                         .foregroundColor(.white)
+                    Spacer()
+                    Picker("Source", selection: $audioManager.inputSource) {
+                        ForEach(AudioInputSource.allCases) { source in
+                            Text(source.rawValue).tag(source)
+                        }
+                    }
+                    .frame(width: 220)
                 }
                 
                 Text("Select whether to record from your microphone or capture all system audio.")
                     .font(.body)
                     .foregroundColor(ThemeColors.secondaryText)
-                
-                Picker("", selection: $audioManager.inputSource) {
-                    ForEach(AudioInputSource.allCases) { source in
-                        Text(source.rawValue).tag(source)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.vertical, 8)
             }
+            
+            Divider().padding(.vertical, 8)
             
             // Permission Configuration Section
             VStack(alignment: .leading, spacing: 12) {
@@ -99,6 +102,7 @@ struct AppSetupView: View {
                 .padding(8)
             }
             
+            Divider().padding(.vertical, 8)
             
             // Startup Configuration Section
             VStack(alignment: .leading, spacing: 12) {
@@ -128,6 +132,8 @@ struct AppSetupView: View {
                 }
                 .padding(8)
             }
+            
+            Divider().padding(.vertical, 8)
             
             // Watch Folder Section
             VStack(alignment: .leading, spacing: 12) {
@@ -184,6 +190,8 @@ struct AppSetupView: View {
                 .padding(8)
             }
             
+            Divider().padding(.vertical, 8)
+            
             // Sound Settings Section
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
@@ -210,6 +218,37 @@ struct AppSetupView: View {
                 .padding(8)
             }
             
+            Divider().padding(.vertical, 8)
+            
+            // Voice Webhook Section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                    Text("Voice Webhook")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Picker("Webhook", selection: Binding(
+                        get: { voiceWebhookEndpointId },
+                        set: { newValue in
+                            voiceWebhookEndpointId = newValue
+                            UserDefaults.standard.set(newValue, forKey: "voiceWebhookEndpointId")
+                        }
+                    )) {
+                        Text("None").tag("")
+                        ForEach(webhookManager.endpoints) { endpoint in
+                            Text(endpoint.name).tag(endpoint.id.uuidString)
+                        }
+                    }
+                    .frame(width: 220)
+                }
+                
+                Text("Forward voice transcription results to the selected webhook endpoint.")
+                    .font(.body)
+                    .foregroundColor(ThemeColors.secondaryText)
+            }
 
         }
         // Use transparent background since this view is already wrapped in .settingsCardStyle() by the parent

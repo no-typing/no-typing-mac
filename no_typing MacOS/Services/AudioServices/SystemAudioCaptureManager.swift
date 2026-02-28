@@ -37,7 +37,7 @@ class SystemAudioCaptureManager: NSObject, ObservableObject {
         hasPermission = CGRequestScreenCaptureAccess()
     }
     
-    func startRecording() async throws {
+    func startRecording(includeMicrophone: Bool = false) async throws {
         guard hasPermission else {
             requestPermission()
             if !CGPreflightScreenCaptureAccess() {
@@ -63,6 +63,15 @@ class SystemAudioCaptureManager: NSObject, ObservableObject {
         configuration.excludesCurrentProcessAudio = true // Don't capture app's own sounds
         configuration.sampleRate = 16000
         configuration.channelCount = 1
+        
+        // Mix microphone audio into the system audio stream (macOS 14+)
+        if includeMicrophone {
+            if #available(macOS 15.0, *) {
+                configuration.captureMicrophone = true
+            } else {
+                print("SystemAudioCaptureManager: captureMicrophone requires macOS 15+, mic will not be included")
+            }
+        }
         
         let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
         self.stream = stream

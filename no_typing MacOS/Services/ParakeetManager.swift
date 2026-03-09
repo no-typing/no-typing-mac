@@ -1,220 +1,255 @@
 import Foundation
 
-/// Manages inference for NVIDIA Parakeet models using ONNX runtime via a Python bridge.
-/// Downloads ONNX models from HuggingFace and invokes inference through a bundled Python script.
+/// Manages inference for NVIDIA Parakeet models using sherpa-onnx CLI binary.
+/// Downloads model archives from GitHub releases and invokes the bundled sherpa-onnx-offline binary.
 class ParakeetManager {
     static let shared = ParakeetManager()
     private init() {}
     
     enum ParakeetError: Error, LocalizedError {
         case modelNotDownloaded
-        case pythonNotAvailable
+        case sherpaOnnxNotAvailable
         case inferenceFailed(String)
         case outputParsingFailed
+        case extractionFailed(String)
         
         var errorDescription: String? {
             switch self {
             case .modelNotDownloaded: return "Parakeet model is not downloaded yet."
-            case .pythonNotAvailable: return "Python 3 is required to run Parakeet models. Install via Homebrew: brew install python3"
+            case .sherpaOnnxNotAvailable: return "sherpa-onnx-offline binary not found in app bundle. Please re-install the application."
             case .inferenceFailed(let msg): return "Parakeet inference failed: \(msg)"
             case .outputParsingFailed: return "Failed to parse Parakeet transcription output."
+            case .extractionFailed(let msg): return "Failed to extract model archive: \(msg)"
             }
         }
     }
+    
+    // MARK: - Model Info
+    
+    struct ModelConfig {
+        let archiveName: String
+        let downloadURL: String
+        let directoryName: String
+    }
+    
+    static let modelConfigs: [String: ModelConfig] = [
+        "parakeet_v2": ModelConfig(
+            archiveName: "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+            downloadURL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+            directoryName: "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8"
+        ),
+        "parakeet_v3": ModelConfig(
+            archiveName: "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+            downloadURL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+            directoryName: "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
+        )
+    ]
     
     /// Returns whether the given model ID is a Parakeet model
     static func isParakeetModel(_ modelId: String) -> Bool {
         return modelId.hasPrefix("parakeet_")
     }
     
-    /// Returns the model directory for Parakeet
+    /// Returns the model directory root in Application Support
     private func getModelDirectory() -> URL {
         let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let modelDirectory = applicationSupport.appendingPathComponent("Whisper")
         return modelDirectory
     }
     
-    /// Returns the ONNX model file path for a given model ID
-    func modelFilePath(for modelId: String) -> URL {
-        let fileName: String
-        switch modelId {
-        case "parakeet_v2": fileName = "parakeet-tdt-0.6b-v2.onnx"
-        case "parakeet_v3": fileName = "parakeet-tdt-0.6b-v3.onnx"
-        default: fileName = "parakeet-tdt-0.6b-v2.onnx"
+    /// Returns the extracted model directory for a given model ID
+    func modelDirectoryPath(for modelId: String) -> URL {
+        guard let config = Self.modelConfigs[modelId] else {
+            return getModelDirectory().appendingPathComponent("parakeet-unknown")
         }
-        return getModelDirectory().appendingPathComponent(fileName)
+        return getModelDirectory().appendingPathComponent(config.directoryName)
     }
     
-    /// Check if model is available locally
+    /// Check if model is available locally (extracted directory with required files)
     func isModelAvailable(modelId: String) -> Bool {
-        return FileManager.default.fileExists(atPath: modelFilePath(for: modelId).path)
+        let modelDir = modelDirectoryPath(for: modelId)
+        let encoder = modelDir.appendingPathComponent("encoder.int8.onnx")
+        let decoder = modelDir.appendingPathComponent("decoder.int8.onnx")
+        let joiner = modelDir.appendingPathComponent("joiner.int8.onnx")
+        let tokens = modelDir.appendingPathComponent("tokens.txt")
+        
+        let fm = FileManager.default
+        return fm.fileExists(atPath: encoder.path) &&
+               fm.fileExists(atPath: decoder.path) &&
+               fm.fileExists(atPath: joiner.path) &&
+               fm.fileExists(atPath: tokens.path)
     }
     
-    /// Check if Python 3 and required packages are available
-    func checkPrerequisites() -> (ready: Bool, message: String) {
-        // Check for Python 3
-        let pythonPaths = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/usr/bin/python3"]
-        guard let pythonPath = pythonPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
-            return (false, "Python 3 is required. Install via: brew install python3")
-        }
-        
-        // Check for onnx_asr package
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: pythonPath)
-        process.arguments = ["-c", "import onnx_asr"]
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        
-        do {
-            try process.run()
-            process.waitUntilExit()
-            
-            if process.terminationStatus != 0 {
-                return (false, "Required Python package missing. Install via: pip3 install onnx_asr")
+    /// Check if sherpa-onnx-offline binary is available in the bundle
+    func isSherpaOnnxAvailable() -> Bool {
+        return getSherpaOnnxURL() != nil
+    }
+    
+    /// Get the path to the bundled sherpa-onnx-offline binary
+    private func getSherpaOnnxURL() -> URL? {
+        // First check standard executable path (Contents/MacOS/sherpa-onnx-offline)
+        if let execURL = Bundle.main.url(forAuxiliaryExecutable: "sherpa-onnx-offline") {
+            if FileManager.default.fileExists(atPath: execURL.path) {
+                return execURL
             }
-        } catch {
-            return (false, "Failed to verify Python packages: \(error.localizedDescription)")
         }
         
-        return (true, "Ready")
+        // Fallback to Resources
+        return Bundle.main.url(forResource: "sherpa-onnx-offline", withExtension: nil)
     }
     
     /// Returns a human-readable requirements string for the UI
     static var requirementsDescription: String {
-        return "Requires: Python 3 + pip3 install onnx_asr"
+        return "Powered by Sherpa-ONNX (M-series Mac recommended)"
     }
     
-    /// Run Parakeet inference on an audio file using onnx-asr Python package
-    func transcribe(audioURL: URL, modelId: String, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
-        let modelPath = modelFilePath(for: modelId)
+    // MARK: - Archive Extraction
+    
+    /// Extract a downloaded tar.bz2 archive to the model directory
+    func extractModelArchive(archivePath: URL, modelId: String) throws {
+        guard let config = Self.modelConfigs[modelId] else {
+            throw ParakeetError.extractionFailed("Unknown model ID: \(modelId)")
+        }
         
-        guard FileManager.default.fileExists(atPath: modelPath.path) else {
+        let destinationDir = getModelDirectory()
+        let extractedDir = destinationDir.appendingPathComponent(config.directoryName)
+        
+        // Remove existing extracted directory if present
+        if FileManager.default.fileExists(atPath: extractedDir.path) {
+            try FileManager.default.removeItem(at: extractedDir)
+        }
+        
+        // Extract using tar command
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+        process.arguments = ["-xjf", archivePath.path, "-C", destinationDir.path]
+        process.standardOutput = Pipe()
+        
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
+        
+        try process.run()
+        process.waitUntilExit()
+        
+        if process.terminationStatus != 0 {
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorMsg = String(data: errorData, encoding: .utf8) ?? "Unknown extraction error"
+            throw ParakeetError.extractionFailed(errorMsg)
+        }
+        
+        // Verify extraction produced the expected files
+        guard isModelAvailable(modelId: modelId) else {
+            throw ParakeetError.extractionFailed("Expected model files not found after extraction in \(config.directoryName)")
+        }
+        
+        // Clean up the archive file
+        try? FileManager.default.removeItem(at: archivePath)
+    }
+    
+    // MARK: - Transcription
+    
+    /// Run Parakeet inference on an audio file using sherpa-onnx-offline CLI
+    func transcribe(audioURL: URL, modelId: String, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
+        guard isModelAvailable(modelId: modelId) else {
             completion(.failure(ParakeetError.modelNotDownloaded))
             return
         }
         
-        // Find python3
-        let pythonPaths = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/usr/bin/python3"]
-        guard let pythonPath = pythonPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
-            completion(.failure(ParakeetError.pythonNotAvailable))
+        guard let sherpaURL = getSherpaOnnxURL() else {
+            completion(.failure(ParakeetError.sherpaOnnxNotAvailable))
             return
         }
         
+        let modelDir = modelDirectoryPath(for: modelId)
+        let encoder = modelDir.appendingPathComponent("encoder.int8.onnx")
+        let decoder = modelDir.appendingPathComponent("decoder.int8.onnx")
+        let joiner = modelDir.appendingPathComponent("joiner.int8.onnx")
+        let tokens = modelDir.appendingPathComponent("tokens.txt")
+        
         let processQueue = DispatchQueue(label: "com.no_typing.parakeet.inference", qos: .userInitiated)
         processQueue.async {
-            let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("parakeet_\(UUID().uuidString)")
-            try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-            let outputFile = tempDir.appendingPathComponent("output.json")
-            
-            // Create a Python script for inference
-            let scriptContent = """
-            import json, sys, os
-            try:
-                from onnx_asr import Transcriber
-                transcriber = Transcriber(model_path=sys.argv[1])
-                result = transcriber.transcribe(sys.argv[2])
-                # Output JSON with segments
-                segments = []
-                if hasattr(result, 'segments'):
-                    for seg in result.segments:
-                        segments.append({
-                            "start": seg.start,
-                            "end": seg.end,
-                            "text": seg.text
-                        })
-                else:
-                    # Fallback: entire text as single segment
-                    segments.append({
-                        "start": 0.0,
-                        "end": 0.0,
-                        "text": str(result) if not isinstance(result, dict) else result.get("text", "")
-                    })
-                with open(sys.argv[3], 'w') as f:
-                    json.dump({"segments": segments}, f)
-            except ImportError:
-                # Fallback: try nemo_toolkit
-                try:
-                    import nemo.collections.asr as nemo_asr
-                    model = nemo_asr.models.ASRModel.restore_from(sys.argv[1])
-                    text = model.transcribe([sys.argv[2]])
-                    segments = [{"start": 0.0, "end": 0.0, "text": text[0] if isinstance(text, list) else str(text)}]
-                    with open(sys.argv[3], 'w') as f:
-                        json.dump({"segments": segments}, f)
-                except Exception as e:
-                    print(f"ERROR: {e}", file=sys.stderr)
-                    sys.exit(1)
-            except Exception as e:
-                print(f"ERROR: {e}", file=sys.stderr)
-                sys.exit(1)
-            """
-            
-            let scriptPath = tempDir.appendingPathComponent("parakeet_infer.py")
-            try? scriptContent.write(to: scriptPath, atomically: true, encoding: .utf8)
-            
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: pythonPath)
-            process.arguments = [scriptPath.path, modelPath.path, audioURL.path, outputFile.path]
-            process.currentDirectoryURL = tempDir
+            process.executableURL = sherpaURL
+            process.arguments = [
+                "--encoder=\(encoder.path)",
+                "--decoder=\(decoder.path)",
+                "--joiner=\(joiner.path)",
+                "--tokens=\(tokens.path)",
+                "--num-threads=4",
+                "--feat-dim=128",
+                "--sample-rate=16000",
+                "--decoding-method=greedy_search",
+                audioURL.path
+            ]
             
-            let errorPipe = Pipe()
-            process.standardError = errorPipe
-            process.standardOutput = Pipe() // Suppress stdout
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
             
             do {
                 try process.run()
                 process.waitUntilExit()
                 
+                let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                
                 if process.terminationStatus != 0 {
-                    let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                    let errorMsg = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-                    
-                    // Clean up
-                    try? FileManager.default.removeItem(at: tempDir)
-                    
                     DispatchQueue.main.async {
-                        completion(.failure(ParakeetError.inferenceFailed(errorMsg)))
+                        completion(.failure(ParakeetError.inferenceFailed(output)))
                     }
                     return
                 }
                 
-                // Parse the output JSON
-                let outputData = try Data(contentsOf: outputFile)
-                let decoded = try JSONDecoder().decode(ParakeetOutput.self, from: outputData)
+                // sherpa-onnx-offline outputs a JSON string describing the transcription
+                let transcribedText = self.parseOutput(output)
                 
-                let segments = decoded.segments.map { seg in
-                    WhisperTranscriptionSegment(
-                        startTime: seg.start,
-                        endTime: seg.end,
-                        text: seg.text,
-                        translatedText: nil,
-                        speaker: nil,
-                        isStarred: false
-                    )
+                if transcribedText.isEmpty {
+                    DispatchQueue.main.async {
+                        completion(.failure(ParakeetError.outputParsingFailed))
+                    }
+                    return
                 }
                 
-                // Clean up
-                try? FileManager.default.removeItem(at: tempDir)
+                // Create a single segment with the full text
+                let segment = WhisperTranscriptionSegment(
+                    startTime: 0.0,
+                    endTime: 0.0,
+                    text: transcribedText,
+                    translatedText: nil,
+                    speaker: nil,
+                    isStarred: false
+                )
                 
                 DispatchQueue.main.async {
-                    completion(.success(segments))
+                    completion(.success([segment]))
                 }
             } catch {
-                try? FileManager.default.removeItem(at: tempDir)
                 DispatchQueue.main.async {
                     completion(.failure(ParakeetError.inferenceFailed(error.localizedDescription)))
                 }
             }
         }
     }
-}
-
-// MARK: - Parakeet Output Models
-private struct ParakeetOutput: Codable {
-    let segments: [ParakeetSegment]
-}
-
-private struct ParakeetSegment: Codable {
-    let start: Double
-    let end: Double
-    let text: String
+    
+    /// Parse the sherpa-onnx-offline stdout output to extract transcription text
+    private func parseOutput(_ output: String) -> String {
+        // sherpa-onnx-offline prints lines but the actual translation is a JSON object.
+        // E.g.: {"lang": "", "emotion": "", "event": "", "text": " Hello world", "timestamps": ...
+        
+        let lines = output.components(separatedBy: .newlines)
+        
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("{") && trimmed.hasSuffix("}") {
+                // Try to parse this JSON payload
+                if let data = trimmed.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                   let text = json["text"] as? String {
+                    return text.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+        }
+        
+        return ""
+    }
 }

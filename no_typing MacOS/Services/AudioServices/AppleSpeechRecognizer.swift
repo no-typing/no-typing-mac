@@ -19,6 +19,8 @@ class AppleSpeechRecognizer: NSObject, ObservableObject {
     var onSpeechDetected: (() -> Void)?
     // Callback for when silence is detected
     var onSilenceDetected: (() -> Void)?
+    // Callback for partial word-by-word streaming text
+    var onPartialTranscription: ((String) -> Void)?
     
     private var silenceTimer: Timer?
     // Different silence thresholds based on recording mode
@@ -191,6 +193,11 @@ class AppleSpeechRecognizer: NSObject, ObservableObject {
                             self.onSpeechDetected?()
                         }
                     }
+                    
+                    let partialText = result.bestTranscription.formattedString
+                    DispatchQueue.main.async {
+                        self.onPartialTranscription?(partialText)
+                    }
                 }
             }
             
@@ -211,8 +218,10 @@ class AppleSpeechRecognizer: NSObject, ObservableObject {
         print("Speech recognition stopping - cleaning up resources")
         
         // Stop silence detection first
-        silenceTimer?.invalidate()
-        silenceTimer = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.silenceTimer?.invalidate()
+            self?.silenceTimer = nil
+        }
         
         // Remove tap from input node if installed
         if hasTapInstalled, let node = currentInputNode {
@@ -247,13 +256,16 @@ class AppleSpeechRecognizer: NSObject, ObservableObject {
     }
     
     private func resetSilenceTimer() {
-        silenceTimer?.invalidate()
-        silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceThreshold, repeats: false) { [weak self] _ in
+        DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            if self.isSpeechDetected {
-                self.isSpeechDetected = false
-                DispatchQueue.main.async {
-                    self.onSilenceDetected?()
+            self.silenceTimer?.invalidate()
+            self.silenceTimer = Timer.scheduledTimer(withTimeInterval: self.silenceThreshold, repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                if self.isSpeechDetected {
+                    self.isSpeechDetected = false
+                    DispatchQueue.main.async {
+                        self.onSilenceDetected?()
+                    }
                 }
             }
         }

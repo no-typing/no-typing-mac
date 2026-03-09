@@ -18,7 +18,8 @@ extension Notification.Name {
 extension UserDefaults {
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
-            "enableAutoPunctuation": true
+            "enableAutoPunctuation": true,
+            "ignoreSilenceSegments": true
         ])
     }
 }

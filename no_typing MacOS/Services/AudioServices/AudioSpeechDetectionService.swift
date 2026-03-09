@@ -70,6 +70,19 @@ class AudioSpeechDetectionService: ObservableObject {
             // Update state
             self.isProcessingSpeech = false
         }
+        
+        speechRecognizer.onPartialTranscription = { [weak self] text in
+            guard let self = self else { return }
+            
+            // Only stream partials if we are explicitly in streaming mode
+            if self.currentRecordingMode == .transcriptionOnly {
+                // Streaming mode is active, so we can send partials
+                let isStreaming = UserDefaults.standard.bool(forKey: "isStreamingMode")
+                if isStreaming {
+                    TranscriptionResultHandler.shared.handleTranscriptionResult(text, duration: nil, isTemporary: true)
+                }
+            }
+        }
     }
     
     func startSpeechDetection(with engine: AVAudioEngine) {

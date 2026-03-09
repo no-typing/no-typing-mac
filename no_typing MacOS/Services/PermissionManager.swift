@@ -135,10 +135,10 @@ class PermissionManager {
     // MARK: - Accessibility Permission
     
     func checkAccessibilityPermission() -> Bool {
-        print("🔑 PERMISSION: Checking accessibility permission")
+        // print("🔑 PERMISSION: Checking accessibility permission")
         #if os(macOS)
         let result = AXIsProcessTrusted()
-        print("🔑 PERMISSION: Accessibility permission status: \(result)")
+        // print("🔑 PERMISSION: Accessibility permission status: \(result)")
         return result
         #else
         return true

@@ -300,12 +300,12 @@ class GlobalHotkeyManager: ObservableObject {
                             // Key was released
                             isHotkeyPressed = false
                             
-                            if isRecording && !isRecordingLocked {
+                            if !isRecordingLocked {
                                 // Only stop if recording is not locked
                                 print("🎙️ Push-to-talk: Option released, stopping recording")
                                 stopRecordingAndSendAudio()
                                 pushToTalkKeyCombo = nil
-                            } else if isRecording && isRecordingLocked {
+                            } else if isRecordingLocked {
                                 print("🔒 Push-to-talk: Option released but recording is locked, continuing...")
                             }
                         }
@@ -447,11 +447,11 @@ class GlobalHotkeyManager: ObservableObject {
             if let combo = pushToTalkKeyCombo, combo.keyCode == keyCode {
                 isHotkeyPressed = false
                 
-                if isRecording && !isRecordingLocked {
+                if !isRecordingLocked {
                     print("🎙️ Push-to-talk: Key released, stopping recording")
                     stopRecordingAndSendAudio()
                     pushToTalkKeyCombo = nil
-                } else if isRecording && isRecordingLocked {
+                } else if isRecordingLocked {
                     print("🔒 Push-to-talk: Key released but recording is locked, continuing...")
                 }
             }
@@ -531,7 +531,7 @@ class GlobalHotkeyManager: ObservableObject {
     }
 
     private func stopRecordingAndSendAudio() {
-        guard isRecording else { return }
+        // Removed `guard isRecording` since we might need to cancel a pending start
         
         print("🎙️ Stopping transcription")
         isRecording = false

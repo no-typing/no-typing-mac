@@ -215,6 +215,18 @@ struct WhisperModelSelectionView: View {
         }
     }
     
+    static func downloadSizeForModel(_ id: String) -> String {
+        switch id {
+        case "small", "Small": return "466 MB"
+        case "large_v3", "largev3": return "3.1 GB"
+        case "large_v3_turbo", "largev3turbo": return "1.6 GB"
+        case "distil_large_v3.5": return "756 MB"
+        case "parakeet_v2": return "460 MB"
+        case "parakeet_v3": return "465 MB"
+        default: return ""
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if showTitle {
@@ -278,13 +290,23 @@ struct WhisperModelSelectionView: View {
                                                 
                                                 if !model.isAvailable {
                                                     if whisperManager.isDownloading && model.id == whisperManager.downloadingModelSize {
-                                                        Text("\(Int(whisperManager.downloadProgress * 100))%")
-                                                            .font(.system(size: 11, weight: .bold))
-                                                            .foregroundColor(ThemeColors.accent)
+                                                        HStack(spacing: 6) {
+                                                            Text(Self.downloadSizeForModel(model.id))
+                                                                .font(.system(size: 10, weight: .medium))
+                                                                .foregroundColor(Color.gray.opacity(0.8))
+                                                            Text("\(Int(whisperManager.downloadProgress * 100))%")
+                                                                .font(.system(size: 11, weight: .bold))
+                                                                .foregroundColor(ThemeColors.accent)
+                                                        }
                                                     } else {
-                                                        Image(systemName: "icloud.and.arrow.down")
-                                                            .font(.system(size: 18))
-                                                            .foregroundColor(Color.gray.opacity(0.6))
+                                                        HStack(spacing: 4) {
+                                                            Text(Self.downloadSizeForModel(model.id))
+                                                                .font(.system(size: 10, weight: .medium))
+                                                                .foregroundColor(Color.gray.opacity(0.6))
+                                                            Image(systemName: "icloud.and.arrow.down")
+                                                                .font(.system(size: 18))
+                                                                .foregroundColor(Color.gray.opacity(0.6))
+                                                        }
                                                     }
                                                 } else {
                                                     HStack(spacing: 8) {
@@ -330,12 +352,12 @@ struct WhisperModelSelectionView: View {
                                                 .cornerRadius(4)
                                             
                                             // Requirements badge for Parakeet models
-                                            if ParakeetManager.isParakeetModel(model.id) {
-                                                Text(ParakeetManager.requirementsDescription)
-                                                    .font(.system(size: 9))
-                                                    .foregroundColor(.orange.opacity(0.9))
-                                                    .padding(.top, 2)
-                                            }
+                                            // if ParakeetManager.isParakeetModel(model.id) {
+                                            //     Text(ParakeetManager.requirementsDescription)
+                                            //         .font(.system(size: 9))
+                                            //         .foregroundColor(.green.opacity(0.8))
+                                            //         .padding(.top, 2)
+                                            // }
                                                 
                                             // Progress bar for downloading
                                             if !model.isAvailable && whisperManager.isDownloading && model.id == whisperManager.downloadingModelSize {

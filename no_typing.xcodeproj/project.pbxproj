@@ -8,6 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		23B822972CDCE16B0003C523 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 23B822962CDCE16B0003C523 /* Sparkle */; };
+		5EAFD485AA72A0F7FB03CA1E /* libcargs.dylib in Copy Sherpa Binary */ = {isa = PBXBuildFile; fileRef = CC2CCDC9B2A1F7A866A65D4A /* libcargs.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		714C83563FF7B9C54C2CF44B /* libonnxruntime.1.17.1.dylib in Copy Sherpa Binary */ = {isa = PBXBuildFile; fileRef = 81915B6F83DE4C405F682FC1 /* libonnxruntime.1.17.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		943B1FE9D654860290C97066 /* libonnxruntime.dylib in Copy Sherpa Binary */ = {isa = PBXBuildFile; fileRef = 4E1C6A15691EAAC8F0ED960E /* libonnxruntime.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		9AA52CB1CE199EA3F5A74179 /* sherpa-onnx-offline in Copy Sherpa Binary */ = {isa = PBXBuildFile; fileRef = 43091A3DB1A1B8E8760697AD /* sherpa-onnx-offline */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		C3C58C95263DD908D0126A0E /* libsherpa-onnx-c-api.dylib in Copy Sherpa Binary */ = {isa = PBXBuildFile; fileRef = 0A066B9893C755887BFC5C6C /* libsherpa-onnx-c-api.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		CFD693B040F546EEEE82D37B /* libsherpa-onnx-cxx-api.dylib in Copy Sherpa Binary */ = {isa = PBXBuildFile; fileRef = 90CFA990A187B46B991A5BED /* libsherpa-onnx-cxx-api.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,14 +54,36 @@
 			name = "Copy Files";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F78F9C3BD996F72246756EED /* Copy Sherpa Binary */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				9AA52CB1CE199EA3F5A74179 /* sherpa-onnx-offline in Copy Sherpa Binary */,
+				714C83563FF7B9C54C2CF44B /* libonnxruntime.1.17.1.dylib in Copy Sherpa Binary */,
+				943B1FE9D654860290C97066 /* libonnxruntime.dylib in Copy Sherpa Binary */,
+				C3C58C95263DD908D0126A0E /* libsherpa-onnx-c-api.dylib in Copy Sherpa Binary */,
+				CFD693B040F546EEEE82D37B /* libsherpa-onnx-cxx-api.dylib in Copy Sherpa Binary */,
+				5EAFD485AA72A0F7FB03CA1E /* libcargs.dylib in Copy Sherpa Binary */,
+			);
+			name = "Copy Sherpa Binary";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0A066B9893C755887BFC5C6C /* libsherpa-onnx-c-api.dylib */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.dylib"; name = "libsherpa-onnx-c-api.dylib"; path = "Resources/SherpaOnnx/lib/libsherpa-onnx-c-api.dylib"; sourceTree = "<group>"; };
 		2369467F2CB1F357002E8CBD /* No-Typing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "No-Typing.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		2369468F2CB1F359002E8CBD /* no_typing MacOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "no_typing MacOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		236946992CB1F359002E8CBD /* no_typing MacOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "no_typing MacOSUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		23C7616C2C92231E0094B283 /* no_typingTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = no_typingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		23C761762C92231E0094B283 /* no_typingUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = no_typingUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		43091A3DB1A1B8E8760697AD /* sherpa-onnx-offline */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; name = "sherpa-onnx-offline"; path = "Resources/SherpaOnnx/sherpa-onnx-offline"; sourceTree = "<group>"; };
+		4E1C6A15691EAAC8F0ED960E /* libonnxruntime.dylib */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.dylib"; name = libonnxruntime.dylib; path = Resources/SherpaOnnx/lib/libonnxruntime.dylib; sourceTree = "<group>"; };
+		81915B6F83DE4C405F682FC1 /* libonnxruntime.1.17.1.dylib */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.dylib"; name = libonnxruntime.1.17.1.dylib; path = Resources/SherpaOnnx/lib/libonnxruntime.1.17.1.dylib; sourceTree = "<group>"; };
+		90CFA990A187B46B991A5BED /* libsherpa-onnx-cxx-api.dylib */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.dylib"; name = "libsherpa-onnx-cxx-api.dylib"; path = "Resources/SherpaOnnx/lib/libsherpa-onnx-cxx-api.dylib"; sourceTree = "<group>"; };
+		CC2CCDC9B2A1F7A866A65D4A /* libcargs.dylib */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.dylib"; name = libcargs.dylib; path = Resources/SherpaOnnx/lib/libcargs.dylib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -76,13 +104,8 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		2368A98F2D714FB200BDFFE7 /* Exceptions for "Resources" folder in "Copy Files" phase from "no_typing MacOS" target */ = {
+		2368A98F2D714FB200BDFFE7 /* Exceptions for "Resources" folder in "Copy Files" build phase */ = {
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			attributesByRelativePath = {
-				Frameworks/Mantle.framework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
-				Frameworks/ReactiveObjC.framework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
-				Frameworks/Squirrel.framework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
-			};
 			buildPhase = 2368A9862D714F9D00BDFFE7 /* Copy Files */;
 			membershipExceptions = (
 				Frameworks/Mantle.framework,
@@ -105,7 +128,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				236D39C32CDDA2E400F8B429 /* Exceptions for "Resources" folder in "no_typing MacOS" target */,
-				2368A98F2D714FB200BDFFE7 /* Exceptions for "Resources" folder in "Copy Files" phase from "no_typing MacOS" target */,
+				2368A98F2D714FB200BDFFE7 /* Exceptions for "Resources" folder in "Copy Files" build phase */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -166,6 +189,7 @@
 				236946802CB1F357002E8CBD /* no_typing MacOS */,
 				2312C60D2C92673500B8A315 /* Frameworks */,
 				23C7615D2C92231C0094B283 /* Products */,
+				AF7558F9612D5D94015E950F /* Support */,
 			);
 			sourceTree = "<group>";
 		};
@@ -181,6 +205,19 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		AF7558F9612D5D94015E950F /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				43091A3DB1A1B8E8760697AD /* sherpa-onnx-offline */,
+				81915B6F83DE4C405F682FC1 /* libonnxruntime.1.17.1.dylib */,
+				4E1C6A15691EAAC8F0ED960E /* libonnxruntime.dylib */,
+				0A066B9893C755887BFC5C6C /* libsherpa-onnx-c-api.dylib */,
+				90CFA990A187B46B991A5BED /* libsherpa-onnx-cxx-api.dylib */,
+				CC2CCDC9B2A1F7A866A65D4A /* libcargs.dylib */,
+			);
+			name = Support;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -193,6 +230,7 @@
 				2369467D2CB1F357002E8CBD /* Resources */,
 				2368A9712D714DF900BDFFE7 /* Copy LLM Ex */,
 				2368A9862D714F9D00BDFFE7 /* Copy Files */,
+				F78F9C3BD996F72246756EED /* Copy Sherpa Binary */,
 			);
 			buildRules = (
 			);
@@ -223,8 +261,6 @@
 				236946912CB1F359002E8CBD /* PBXTargetDependency */,
 			);
 			name = "no_typing MacOSTests";
-			packageProductDependencies = (
-			);
 			productName = "thinking aloud MacOSTests";
 			productReference = 2369468F2CB1F359002E8CBD /* no_typing MacOSTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -243,8 +279,6 @@
 				2369469B2CB1F359002E8CBD /* PBXTargetDependency */,
 			);
 			name = "no_typing MacOSUITests";
-			packageProductDependencies = (
-			);
 			productName = "thinking aloud MacOSUITests";
 			productReference = 236946992CB1F359002E8CBD /* no_typing MacOSUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -262,8 +296,6 @@
 			dependencies = (
 			);
 			name = no_typingTests;
-			packageProductDependencies = (
-			);
 			productName = "thinking aloudTests";
 			productReference = 23C7616C2C92231E0094B283 /* no_typingTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -281,8 +313,6 @@
 			dependencies = (
 			);
 			name = no_typingUITests;
-			packageProductDependencies = (
-			);
 			productName = "thinking aloudUITests";
 			productReference = 23C761762C92231E0094B283 /* no_typingUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";

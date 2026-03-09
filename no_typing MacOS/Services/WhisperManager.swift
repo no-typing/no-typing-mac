@@ -171,14 +171,14 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             displayName: "Parakeet v2",
             icon: "bird",
             description: "NVIDIA's 0.6B param Fast Conformer TDT model. English-only, up to 300x realtime on Apple Silicon.",
-            recommendation: "Fastest English transcription (M-series required)"
+            recommendation: "Fastest English transcription (M-series recommended)"
         ),
         "parakeet_v3": ModelDisplayInfo(
             id: "parakeet_v3",
             displayName: "Parakeet v3",
             icon: "bird.fill",
             description: "NVIDIA's multilingual 0.6B param model. Supports 25 European languages with auto-detection.",
-            recommendation: "Fastest multilingual (M-series required)"
+            recommendation: "Fastest multilingual (M-series recommended)"
         )
     ]
 
@@ -229,18 +229,26 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             ("large_v3", "ggml-large-v3.bin"),
             ("large_v3_turbo", "ggml-large-v3-turbo.bin"),
             ("distil_large_v3.5", "ggml-distil-large-v3.5.bin"),
-            ("parakeet_v2", "parakeet-tdt-0.6b-v2.onnx"),
-            ("parakeet_v3", "parakeet-tdt-0.6b-v3.onnx")
+            ("parakeet_v2", "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8"),
+            ("parakeet_v3", "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8")
         ]
 
         var modelsInfo: [WhisperModelInfo] = []
         var selectedModelAvailable = false
 
         for (size, fileName) in models {
-            let fileURL = getModelDirectory().appendingPathComponent(fileName)
-            let isAvailable = FileManager.default.fileExists(atPath: fileURL.path)
-            let fileSize = isAvailable ? (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? UInt64) ?? 0 : 0
-            let sizeString = isAvailable ? ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file) : ""
+            // For Parakeet models, check via ParakeetManager (directory-based)
+            let isAvailable: Bool
+            let fileSize: UInt64
+            if ParakeetManager.isParakeetModel(size) {
+                isAvailable = ParakeetManager.shared.isModelAvailable(modelId: size)
+                fileSize = 0 // Directory-based model, skip size calculation
+            } else {
+                let fileURL = getModelDirectory().appendingPathComponent(fileName)
+                isAvailable = FileManager.default.fileExists(atPath: fileURL.path)
+                fileSize = isAvailable ? (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? UInt64) ?? 0 : 0
+            }
+            let sizeString = (isAvailable && fileSize > 0) ? ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file) : ""
             let isSelected = size == selectedModelSize
 
             if isSelected {
@@ -314,11 +322,13 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             fileName = "ggml-distil-large-v3.5.bin"
             urlString = "https://huggingface.co/distil-whisper/distil-large-v3.5-ggml/resolve/main/ggml-model.bin"
         case "parakeet_v2":
-            fileName = "parakeet-tdt-0.6b-v2.onnx"
-            urlString = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v2-onnx/resolve/main/model.onnx"
+            let config = ParakeetManager.modelConfigs["parakeet_v2"]!
+            fileName = config.archiveName
+            urlString = config.downloadURL
         case "parakeet_v3":
-            fileName = "parakeet-tdt-0.6b-v3.onnx"
-            urlString = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/model.onnx"
+            let config = ParakeetManager.modelConfigs["parakeet_v3"]!
+            fileName = config.archiveName
+            urlString = config.downloadURL
         case "large_v3_turbo", "largev3turbo":
             fallthrough
         default:
@@ -337,7 +347,10 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         modelFileName = fileName
         errorMessage = nil
 
-        let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300  // 5 min timeout for initial response
+        config.timeoutIntervalForResource = 3600 // 1 hour for full download
+        let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         self.downloadSession = session
         let task = session.downloadTask(with: url)
         self.downloadTask = task
@@ -366,12 +379,11 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
     // Select a different Whisper model
     func selectModel(modelSize: String) {
-        // For Parakeet models, verify prerequisites first
+        // For Parakeet models, verify sherpa-onnx binary is available
         if ParakeetManager.isParakeetModel(modelSize) {
-            let prereqResult = ParakeetManager.shared.checkPrerequisites()
-            if !prereqResult.ready {
+            guard ParakeetManager.shared.isSherpaOnnxAvailable() else {
                 DispatchQueue.main.async {
-                    self.errorMessage = prereqResult.message
+                    self.errorMessage = "sherpa-onnx-offline binary not found in app bundle. Please re-install the application."
                 }
                 return
             }
@@ -388,7 +400,13 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     func deleteModel(modelSize: String) {
         guard let modelInfo = availableModels.first(where: { $0.id == modelSize }) else { return }
 
-        let fileURL = getModelDirectory().appendingPathComponent(modelInfo.fileName)
+        // For Parakeet models, delete the extracted directory
+        let fileURL: URL
+        if ParakeetManager.isParakeetModel(modelSize) {
+            fileURL = ParakeetManager.shared.modelDirectoryPath(for: modelSize)
+        } else {
+            fileURL = getModelDirectory().appendingPathComponent(modelInfo.fileName)
+        }
         do {
             try FileManager.default.removeItem(at: fileURL)
             if selectedModelSize == modelSize {
@@ -561,6 +579,20 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
 
     func transcribe(audioURL: URL, mode: RecordingMode, targetLanguage: String? = nil, translateToEnglish: Bool = false, completion: @escaping (Result<String, Error>) -> Void) {
+        // Route Parakeet models through ParakeetManager
+        if ParakeetManager.isParakeetModel(selectedModelSize) {
+            ParakeetManager.shared.transcribe(audioURL: audioURL, modelId: selectedModelSize) { result in
+                switch result {
+                case .success(let segments):
+                    let fullText = segments.map { $0.text }.joined(separator: " ")
+                    completion(.success(fullText))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+            return
+        }
+        
         // Update last use time
         lastModelUseTime = Date()
         
@@ -675,9 +707,11 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                     .components(separatedBy: .newlines)
                     .map { line -> String in
                         if ignoreSilence {
-                            return line.replacingOccurrences(of: "\\[.*?\\]|\\(.*?\\)|♪.*?♪", with: "", options: .regularExpression)
+                            let cleaned = line.replacingOccurrences(of: "\\[.*?\\][.,!?]*|\\(.*?\\)[.,!?]*|♪.*?♪", with: "", options: .regularExpression)
                                 .replacingOccurrences(of: "♪", with: "")
                                 .trimmingCharacters(in: .whitespacesAndNewlines)
+                            // If it's just punctuation left, clear it
+                            return cleaned.trimmingCharacters(in: CharacterSet(charactersIn: ".,!? ")).isEmpty ? "" : cleaned
                         } else {
                             return line.trimmingCharacters(in: .whitespacesAndNewlines)
                         }
@@ -920,10 +954,13 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         let ignoreSilence = UserDefaults.standard.bool(forKey: "ignoreSilenceSegments")
         guard ignoreSilence else { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
         
-        return text
-            .replacingOccurrences(of: "\\[.*?\\]|\\(.*?\\)|♪.*?♪", with: "", options: .regularExpression)
+        let cleaned = text
+            .replacingOccurrences(of: "\\[.*?\\][.,!?]*|\\(.*?\\)[.,!?]*|♪.*?♪", with: "", options: .regularExpression)
             .replacingOccurrences(of: "♪", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+            
+        // If it's just punctuation left, return empty
+        return cleaned.trimmingCharacters(in: CharacterSet(charactersIn: ".,!? ")).isEmpty ? "" : cleaned
     }
 
     // MARK: - URLSessionDownloadDelegate Methods
@@ -952,37 +989,61 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 }
                 return
             }
-
-            // Remove existing file if necessary
-            if fileManager.fileExists(atPath: destinationURL.path) {
-                try fileManager.removeItem(at: destinationURL)
-            }
-
-            // Move the file from the temporary location to the destination URL
-            try fileManager.moveItem(at: location, to: destinationURL)
-
-            DispatchQueue.main.async {
-                self.isDownloading = false
-                self.downloadingModelSize = nil
-                self.downloadProgress = 1.0
-                self.isReady = true
+            
+            // Check if this is a Parakeet model (tar.bz2 archive that needs extraction)
+            let isParakeet = destinationFileName.hasSuffix(".tar.bz2")
+            
+            if isParakeet {
+                // Move archive to model directory first
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    try fileManager.removeItem(at: destinationURL)
+                }
+                try fileManager.moveItem(at: location, to: destinationURL)
                 
-                // Automatically select the newly downloaded model (skip for Parakeet - needs prerequisite check)
-                if let modelSize = self.availableModels.first(where: { $0.fileName == destinationFileName })?.id {
-                    if ParakeetManager.isParakeetModel(modelSize) {
-                        // Don't auto-select - just refresh the list. User must explicitly select.
-                        self.loadAvailableModels()
+                // Determine which Parakeet model this is
+                let modelId = self.downloadingModelSize ?? ""
+                
+                // Extract on background thread
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        try ParakeetManager.shared.extractModelArchive(archivePath: destinationURL, modelId: modelId)
                         
-                        let prereq = ParakeetManager.shared.checkPrerequisites()
-                        if !prereq.ready {
-                            self.errorMessage = "Parakeet model downloaded. To use it: \(prereq.message)"
+                        DispatchQueue.main.async {
+                            self.isDownloading = false
+                            self.downloadingModelSize = nil
+                            self.downloadProgress = 1.0
+                            self.selectModel(modelSize: modelId)
+                            self.loadAvailableModels()
                         }
-                    } else {
-                        self.selectModel(modelSize: modelSize)
+                    } catch {
+                        DispatchQueue.main.async {
+                            self.errorMessage = "Model extraction failed: \(error.localizedDescription)"
+                            self.isDownloading = false
+                            self.downloadingModelSize = nil
+                            self.downloadProgress = 0.0
+                        }
                     }
                 }
-                
-                self.loadAvailableModels()  // Update available models
+            } else {
+                // Standard Whisper model - single file
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    try fileManager.removeItem(at: destinationURL)
+                }
+                try fileManager.moveItem(at: location, to: destinationURL)
+
+                DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.downloadingModelSize = nil
+                    self.downloadProgress = 1.0
+                    self.isReady = true
+                    
+                    // Automatically select the newly downloaded model
+                    if let modelSize = self.availableModels.first(where: { $0.fileName == destinationFileName })?.id {
+                        self.selectModel(modelSize: modelSize)
+                    }
+                    
+                    self.loadAvailableModels()
+                }
             }
         } catch {
             DispatchQueue.main.async {
@@ -1000,8 +1061,21 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 return
             }
             
+            var friendlyMessage = error.localizedDescription
+            
+            // Provide human-readable errors for common network issues
+            if error.domain == NSURLErrorDomain {
+                if error.code == NSURLErrorCannotFindHost {
+                    friendlyMessage = "Network error: Please check your internet connection."
+                } else if error.code == NSURLErrorNotConnectedToInternet {
+                    friendlyMessage = "Network error: You are not connected to the internet."
+                } else if error.code == NSURLErrorTimedOut {
+                    friendlyMessage = "Network error: The download timed out. Please try again later."
+                }
+            }
+            
             DispatchQueue.main.async {
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = friendlyMessage
                 self.isDownloading = false
                 self.downloadingModelSize = nil
             }
@@ -1012,9 +1086,31 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                     didWriteData bytesWritten: Int64,
                     totalBytesWritten: Int64,
                     totalBytesExpectedToWrite: Int64) {
-        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        
+        var expectedBytes = totalBytesExpectedToWrite
+        
+        // Fallback for GitHub releases where expected bytes might be -1
+        if expectedBytes <= 0 {
+            let modelId = self.downloadingModelSize ?? ""
+            if modelId == "parakeet_v2" {
+                expectedBytes = 482_468_385 // Exact size from curl
+            } else if modelId == "parakeet_v3" {
+                expectedBytes = 485_050_000 // Approximate size
+            } else {
+                expectedBytes = downloadTask.response?.expectedContentLength ?? -1
+            }
+        }
+        
+        // Calculate progress, ensuring we don't divide by zero or negative
+        let progress: Double
+        if expectedBytes > 0 {
+            progress = Double(totalBytesWritten) / Double(expectedBytes)
+        } else {
+            progress = min(0.99, self.downloadProgress + 0.001)
+        }
+        
         DispatchQueue.main.async {
-            self.downloadProgress = progress
+            self.downloadProgress = max(0.0, min(1.0, progress))
         }
     }
 

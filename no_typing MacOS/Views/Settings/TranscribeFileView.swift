@@ -191,6 +191,22 @@ struct TranscribeFileView: View {
             }
             .padding(.bottom, 8)
             
+            // Input Mode Views
+            if transcribeMode == .url {
+                urlLinkView
+            } else if transcribeMode == .podcast {
+                podcastView
+            } else {
+                localFileView
+            }
+            
+            // Error Message
+            if let error = manager.errorMessage {
+                Text("Error: \(error)")
+                    .foregroundColor(.red)
+                    .font(.system(size: 13))
+            }
+            
             // Translate Settings
             Toggle(isOn: $manager.translateToEnglish) {
                 HStack(spacing: 6) {
@@ -276,22 +292,6 @@ struct TranscribeFileView: View {
             .cornerRadius(10)
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05)))
             .padding(.bottom, 8)
-            
-            // Input Mode Views
-            if transcribeMode == .url {
-                urlLinkView
-            } else if transcribeMode == .podcast {
-                podcastView
-            } else {
-                localFileView
-            }
-            
-            // Error Message
-            if let error = manager.errorMessage {
-                Text("Error: \(error)")
-                    .foregroundColor(.red)
-                    .font(.system(size: 13))
-            }
             
             // Output Box
             if !manager.transcribedText.isEmpty {

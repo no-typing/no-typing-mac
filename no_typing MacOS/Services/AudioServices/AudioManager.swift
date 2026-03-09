@@ -356,15 +356,18 @@ class AudioManager: ObservableObject {
         }
         
         // Set loading state and show HUD immediately
-        isAudioSetupInProgress = true
-        print("🔄 Audio setup in progress: true")
-        
-        // Show the HUD immediately with loading state
-        DispatchQueue.main.async {
-            // Show HUD immediately while audio engine is being set up
+        let updateUIState = {
             self.isRecording = true
+            self.isAudioSetupInProgress = true
             self.showNotchIndicator()
             print("🎙️ HUD shown with isAudioSetupInProgress: \(self.isAudioSetupInProgress)")
+        }
+        
+        // Update immediately if on main thread to prevent fast tap race conditions
+        if Thread.isMainThread {
+            updateUIState()
+        } else {
+            DispatchQueue.main.async { updateUIState() }
         }
         
         // Get initial device name but don't show notification
@@ -450,8 +453,10 @@ class AudioManager: ObservableObject {
             }
         } else {
             // For streaming mode, stop immediately
-            completeRecordingStop()
+            print("📝 Streaming mode: Processing final audio segment")
         }
+        
+        completeRecordingStop()
     }
     
     private func completeRecordingStop() {
@@ -681,6 +686,13 @@ class AudioManager: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 
+                // If recording was cancelled during setup, don't start
+                guard self.isRecording && !self.isStoppingRecording else {
+                    print("AudioManager: Recording was cancelled during setup, aborting start")
+                    self.audioEngineService.stopEngine()
+                    return
+                }
+                
                 // Set up audio engine for streaming
                 self.audioEngineService.setStreamingState()
                 
@@ -819,13 +831,10 @@ class AudioManager: ObservableObject {
                 self.startRecording(preserveAccumulatedText: !self.isStreamingMode)
             }
         } else {
-            // Max retries reached, give up
-            print("AudioManager: Engine startup failed after \(maxEngineStartupRetries) attempts. Giving up.")
-            engineStartupRetryCount = 0 // Reset for next time
-            hideNotchIndicator()
+            print("AudioManager: Max engine startup retries reached. Failing permanently.")
+            self.hideNotchIndicator()
         }
     }
-    
     
     private func showCursorLoader() {
         print("showCursorLoader called")

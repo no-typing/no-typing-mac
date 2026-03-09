@@ -10,6 +10,11 @@ class FileTranscriptionManager: ObservableObject {
     @Published var wordCount: Int = 0
     @Published var errorMessage: String?
     @Published var currentFileName: String?
+    @Published var currentPhase: String = ""
+    
+    @Published var elapsedTime: TimeInterval = 0
+    private var timer: Timer?
+    private var isCancelled: Bool = false
     
     @Published var transcriptionQueue: [URL] = []
     @Published var totalInBatch: Int = 0
@@ -52,15 +57,19 @@ class FileTranscriptionManager: ObservableObject {
             return
         }
         
+        isCancelled = false
         isTranscribing = true
         errorMessage = nil
+        currentPhase = "Transcribing"
         currentFileName = url.lastPathComponent
+        startTimer()
         
         NotificationManager.shared.requestAuthorization()
         
         let duration = getAudioDuration(url: url)
         
         convertTo16kHzWav(sourceURL: url) { [weak self] conversionResult in
+            if self?.isCancelled == true { return }
             switch conversionResult {
             case .success(let wavURL):
                 WhisperManager.shared.transcribeWithTimestamps(
@@ -70,7 +79,9 @@ class FileTranscriptionManager: ObservableObject {
                     translateToEnglish: self?.translateToEnglish ?? false
                 ) { result in
                     DispatchQueue.main.async {
+                        if self?.isCancelled == true { return }
                         self?.isTranscribing = false
+                        self?.stopTimer()
                         self?.currentFileName = nil
                         
                         // Clean up the temporary wav file
@@ -133,7 +144,9 @@ class FileTranscriptionManager: ObservableObject {
                 }
             case .failure(let error):
                 DispatchQueue.main.async {
+                    if self?.isCancelled == true { return }
                     self?.isTranscribing = false
+                    self?.stopTimer()
                     self?.currentFileName = nil
                     self?.errorMessage = "Failed to convert audio format: \(error.localizedDescription)"
                     NotificationManager.shared.sendNotification(
@@ -149,9 +162,12 @@ class FileTranscriptionManager: ObservableObject {
     
     // MARK: - Cloud Transcription
     private func transcribeFileCloud(url: URL) {
+        isCancelled = false
         isTranscribing = true
         errorMessage = nil
+        currentPhase = "Transcribing"
         currentFileName = url.lastPathComponent
+        startTimer()
         
         NotificationManager.shared.requestAuthorization()
         let duration = getAudioDuration(url: url)
@@ -162,6 +178,7 @@ class FileTranscriptionManager: ObservableObject {
                 let segments = try await CloudTranscriptionManager.shared.transcribe(audioURL: url, provider: provider)
                 
                 await MainActor.run {
+                    if self.isCancelled { return }
                     let rawText = segments.map { $0.text }.joined(separator: " ")
                     let cleanedText = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
                     let formattedText = cleanedText
@@ -202,12 +219,15 @@ class FileTranscriptionManager: ObservableObject {
                     )
                     
                     self.isTranscribing = false
+                    self.stopTimer()
                     self.currentFileName = nil
                     self.processNextIfAvailable()
                 }
             } catch {
                 await MainActor.run {
+                    if self.isCancelled { return }
                     self.isTranscribing = false
+                    self.stopTimer()
                     self.currentFileName = nil
                     self.errorMessage = error.localizedDescription
                     NotificationManager.shared.sendNotification(
@@ -224,6 +244,31 @@ class FileTranscriptionManager: ObservableObject {
         transcribedText = ""
         wordCount = 0
         errorMessage = nil
+        currentPhase = ""
+    }
+    
+    func cancelTranscription() {
+        isCancelled = true
+        isTranscribing = false
+        stopTimer()
+        transcriptionQueue.removeAll()
+        totalInBatch = 0
+        errorMessage = "Transcription cancelled."
+        currentFileName = nil
+        currentPhase = ""
+    }
+    
+    func startTimer() {
+        stopTimer()
+        elapsedTime = 0
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.elapsedTime += 1
+        }
+    }
+    
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
     }
     
     private func getAudioDuration(url: URL) -> TimeInterval {
@@ -273,83 +318,109 @@ class FileTranscriptionManager: ObservableObject {
         let tempDir = FileManager.default.temporaryDirectory
         let outputURL = tempDir.appendingPathComponent("transcode_\(UUID().uuidString).wav")
         
-        do {
-            let asset = AVURLAsset(url: sourceURL)
-            guard let audioTrack = asset.tracks(withMediaType: .audio).first else {
-                completion(.failure(NSError(domain: "FileTranscriptionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No audio track found in file."])))
-                return
-            }
-            
-            let assetReader = try AVAssetReader(asset: asset)
-            
-            let settings: [String: Any] = [
-                AVFormatIDKey: Int(kAudioFormatLinearPCM),
-                AVSampleRateKey: 16000,
-                AVNumberOfChannelsKey: 1,
-                AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsNonInterleaved: false,
-                AVLinearPCMIsFloatKey: false,
-                AVLinearPCMIsBigEndianKey: false
-            ]
-            
-            let trackOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: settings)
-            guard assetReader.canAdd(trackOutput) else {
-                completion(.failure(NSError(domain: "FileTranscriptionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Cannot add track output"])))
-                return
-            }
-            assetReader.add(trackOutput)
-            
-            let assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .wav)
-            let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
-            writerInput.expectsMediaDataInRealTime = false
-            
-            guard assetWriter.canAdd(writerInput) else {
-                completion(.failure(NSError(domain: "FileTranscriptionManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Cannot add writer input"])))
-                return
-            }
-            assetWriter.add(writerInput)
-            
-            guard assetReader.startReading() else {
-                let errorDesc = assetReader.error?.localizedDescription ?? "Unknown failure"
-                completion(.failure(NSError(domain: "FileTranscriptionManager", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to start reading: \(errorDesc)"])))
-                return
-            }
-            
-            guard assetWriter.startWriting() else {
-                let errorDesc = assetWriter.error?.localizedDescription ?? "Unknown failure"
-                completion(.failure(NSError(domain: "FileTranscriptionManager", code: 5, userInfo: [NSLocalizedDescriptionKey: "Failed to start writing: \(errorDesc)"])))
-                return
-            }
-            
-            assetWriter.startSession(atSourceTime: .zero)
-            
-            let conversionQueue = DispatchQueue(label: "com.no_typing.audio_conversion")
-            
-            writerInput.requestMediaDataWhenReady(on: conversionQueue) {
-                // Explicitly capture assetReader to prevent it from being deallocated by ARC
-                // when the outer function scope exits.
-                _ = assetReader
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let file = try AVAudioFile(forReading: sourceURL)
+                let format = file.processingFormat
                 
-                while writerInput.isReadyForMoreMediaData {
-                    if let sampleBuffer = trackOutput.copyNextSampleBuffer() {
-                        writerInput.append(sampleBuffer)
-                    } else {
-                        writerInput.markAsFinished()
-                        
-                        assetWriter.finishWriting {
-                            if assetWriter.status == .completed {
-                                completion(.success(outputURL))
-                            } else {
-                                completion(.failure(assetWriter.error ?? NSError(domain: "FileTranscriptionManager", code: 6, userInfo: [NSLocalizedDescriptionKey: "Unknown writer error."])))
-                            }
-                        }
-                        return
-                    }
+                // We want standard 16kHz, mono, 16-bit integer PCM Standard Format!
+                guard let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
+                                                       sampleRate: 16000,
+                                                       channels: 1,
+                                                       interleaved: false) else {
+                    completion(.failure(NSError(domain: "FileTranscriptionManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create output audio format"])))
+                    return
                 }
+                
+                // Audio converter for resampling
+                guard let converter = AVAudioConverter(from: format, to: outputFormat) else {
+                    completion(.failure(NSError(domain: "FileTranscriptionManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to create audio converter"])))
+                    return
+                }
+                
+                let frameCapacity = AVAudioFrameCount(file.length)
+                guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
+                    completion(.failure(NSError(domain: "FileTranscriptionManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to allocate input buffer"])))
+                    return
+                }
+                
+                try file.read(into: inputBuffer)
+                
+                // Calculate output buffer size needed
+                let outputFrameCapacity = AVAudioFrameCount(Double(frameCapacity) * (outputFormat.sampleRate / format.sampleRate))
+                guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outputFrameCapacity) else {
+                    completion(.failure(NSError(domain: "FileTranscriptionManager", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to allocate output buffer"])))
+                    return
+                }
+                
+                var error: NSError?
+                let status = converter.convert(to: outputBuffer, error: &error) { packetCount, outStatus in
+                    outStatus.pointee = .haveData
+                    return inputBuffer
+                }
+                
+                if let err = error {
+                    completion(.failure(err))
+                    return
+                }
+                
+                if status == .error {
+                    completion(.failure(NSError(domain: "FileTranscriptionManager", code: 5, userInfo: [NSLocalizedDescriptionKey: "Conversion failed"])))
+                    return
+                }
+                
+                
+                // Construct standard WAV header manually to bypass Extensible generation in AVAudioFile
+                let frameLength = outputBuffer.frameLength
+                guard let channelData = outputBuffer.int16ChannelData else {
+                    completion(.failure(NSError(domain: "FileTranscriptionManager", code: 6, userInfo: [NSLocalizedDescriptionKey: "Failed to get PCM data from buffer"])))
+                    return
+                }
+                
+                let dataSize = UInt32(frameLength) * 2 // 1 channel, 16-bit (2 bytes) per sample
+                var pcmData = Data()
+                
+                // 1. RIFF
+                pcmData.append(contentsOf: "RIFF".utf8)
+                var fileSize = dataSize + 36
+                pcmData.append(Data(bytes: &fileSize, count: 4))
+                
+                // 2. WAVE
+                pcmData.append(contentsOf: "WAVE".utf8)
+                
+                // 3. fmt chunk
+                pcmData.append(contentsOf: "fmt ".utf8)
+                var fmtSize: UInt32 = 16 // Standard PCM fmt chunk is exactly 16 bytes
+                pcmData.append(Data(bytes: &fmtSize, count: 4))
+                var formatTag: UInt16 = 1 // 1 = Standard PCM
+                pcmData.append(Data(bytes: &formatTag, count: 2))
+                var channels: UInt16 = 1
+                pcmData.append(Data(bytes: &channels, count: 2))
+                var sampleRate: UInt32 = 16000
+                pcmData.append(Data(bytes: &sampleRate, count: 4))
+                var byteRate: UInt32 = 16000 * 2 // sampleRate * channels * bytesPerSample
+                pcmData.append(Data(bytes: &byteRate, count: 4))
+                var blockAlign: UInt16 = 2
+                pcmData.append(Data(bytes: &blockAlign, count: 2))
+                var bitsPerSample: UInt16 = 16
+                pcmData.append(Data(bytes: &bitsPerSample, count: 2))
+                
+                // 4. data chunk
+                pcmData.append(contentsOf: "data".utf8)
+                var customDataSize = dataSize
+                pcmData.append(Data(bytes: &customDataSize, count: 4))
+                
+                // Append the raw PCM bytes directly
+                let byteCount = Int(frameLength) * 2
+                let rawPointer = UnsafeRawBufferPointer(start: channelData[0], count: byteCount)
+                pcmData.append(contentsOf: rawPointer)
+                
+                try pcmData.write(to: outputURL)
+                completion(.success(outputURL))
+                
+            } catch {
+                completion(.failure(error))
             }
-            
-        } catch {
-            completion(.failure(error))
         }
     }
 }

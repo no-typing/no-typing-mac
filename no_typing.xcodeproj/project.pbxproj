@@ -104,8 +104,13 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		2368A98F2D714FB200BDFFE7 /* Exceptions for "Resources" folder in "Copy Files" build phase */ = {
+		2368A98F2D714FB200BDFFE7 /* Exceptions for "Resources" folder in "Copy Files" phase from "no_typing MacOS" target */ = {
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			attributesByRelativePath = {
+				Frameworks/Mantle.framework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
+				Frameworks/ReactiveObjC.framework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
+				Frameworks/Squirrel.framework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
+			};
 			buildPhase = 2368A9862D714F9D00BDFFE7 /* Copy Files */;
 			membershipExceptions = (
 				Frameworks/Mantle.framework,
@@ -128,7 +133,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				236D39C32CDDA2E400F8B429 /* Exceptions for "Resources" folder in "no_typing MacOS" target */,
-				2368A98F2D714FB200BDFFE7 /* Exceptions for "Resources" folder in "Copy Files" build phase */,
+				2368A98F2D714FB200BDFFE7 /* Exceptions for "Resources" folder in "Copy Files" phase from "no_typing MacOS" target */,
 			);
 			path = Resources;
 			sourceTree = "<group>";

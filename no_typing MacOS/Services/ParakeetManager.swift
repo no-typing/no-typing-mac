@@ -1,4 +1,5 @@
 import Foundation
+import AVFAudio
 
 /// Manages inference for NVIDIA Parakeet models using sherpa-onnx CLI binary.
 /// Downloads model archives from GitHub releases and invokes the bundled sherpa-onnx-offline binary.
@@ -160,6 +161,84 @@ class ParakeetManager {
             return
         }
         
+        // Standardize and chunk audio to avoid ONNX max sequence length crash on long files
+        splitAndStandardizeAudio(sourceURL: audioURL, chunkDuration: 60.0) { result in
+            switch result {
+            case .success(let chunkURLs):
+                self.runSherpaOnnxOnChunks(chunkURLs: chunkURLs, modelId: modelId, sherpaURL: sherpaURL, completion: completion)
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    private func runSherpaOnnxOnChunks(chunkURLs: [URL], modelId: String, sherpaURL: URL, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
+        let modelDir = modelDirectoryPath(for: modelId)
+        let encoder = modelDir.appendingPathComponent("encoder.int8.onnx")
+        let decoder = modelDir.appendingPathComponent("decoder.int8.onnx")
+        let joiner = modelDir.appendingPathComponent("joiner.int8.onnx")
+        let tokens = modelDir.appendingPathComponent("tokens.txt")
+        
+        var allText = [String]()
+        
+        for chunkURL in chunkURLs {
+            let result = runSherpaOnnxSync(audioURL: chunkURL, sherpaURL: sherpaURL,
+                                           encoder: encoder, decoder: decoder,
+                                           joiner: joiner, tokens: tokens)
+            switch result {
+            case .success(let text):
+                if !text.isEmpty { allText.append(text) }
+            case .failure(let error):
+                // Clean up temp chunks
+                chunkURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+        }
+        
+        // Clean up temp chunks
+        chunkURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+        
+        let fullText = allText.joined(separator: " ")
+        if fullText.isEmpty {
+            DispatchQueue.main.async { completion(.failure(ParakeetError.outputParsingFailed)) }
+            return
+        }
+        let segment = WhisperTranscriptionSegment(startTime: 0, endTime: 0, text: fullText, translatedText: nil, speaker: nil, isStarred: false)
+        DispatchQueue.main.async { completion(.success([segment])) }
+    }
+
+    private func runSherpaOnnxSync(audioURL: URL, sherpaURL: URL, encoder: URL, decoder: URL, joiner: URL, tokens: URL) -> Result<String, Error> {
+        let process = Process()
+        process.executableURL = sherpaURL
+        process.arguments = [
+            "--encoder=\(encoder.path)",
+            "--decoder=\(decoder.path)",
+            "--joiner=\(joiner.path)",
+            "--tokens=\(tokens.path)",
+            "--num-threads=4",
+            "--feat-dim=128",
+            "--sample-rate=16000",
+            "--decoding-method=greedy_search",
+            audioURL.path
+        ]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            if process.terminationStatus != 0 {
+                return .failure(ParakeetError.inferenceFailed(output))
+            }
+            return .success(parseSherpaOutput(output))
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    private func runSherpaOnnx(audioURL: URL, modelId: String, sherpaURL: URL, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
         let modelDir = modelDirectoryPath(for: modelId)
         let encoder = modelDir.appendingPathComponent("encoder.int8.onnx")
         let decoder = modelDir.appendingPathComponent("decoder.int8.onnx")
@@ -201,7 +280,7 @@ class ParakeetManager {
                 }
                 
                 // sherpa-onnx-offline outputs a JSON string describing the transcription
-                let transcribedText = self.parseOutput(output)
+                let transcribedText = self.parseSherpaOutput(output)
                 
                 if transcribedText.isEmpty {
                     DispatchQueue.main.async {
@@ -223,16 +302,214 @@ class ParakeetManager {
                 DispatchQueue.main.async {
                     completion(.success([segment]))
                 }
+                
             } catch {
                 DispatchQueue.main.async {
-                    completion(.failure(ParakeetError.inferenceFailed(error.localizedDescription)))
+                    completion(.failure(error))
                 }
             }
         }
     }
     
+    // MARK: - Format Standardization & Chunking
+    
+    private static let chunkSampleRate: Double = 16000
+
+    /// Split audio into standard PCM chunks of `chunkDuration` seconds each.
+    private func splitAndStandardizeAudio(sourceURL: URL, chunkDuration: Double, completion: @escaping (Result<[URL], Error>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let file = try AVAudioFile(forReading: sourceURL)
+                let sourceSampleRate = file.processingFormat.sampleRate
+                let sourceFormat = file.processingFormat
+                
+                guard let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
+                                                       sampleRate: Self.chunkSampleRate,
+                                                       channels: 1,
+                                                       interleaved: false) else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create output format"])))
+                    return
+                }
+                
+                guard let converter = AVAudioConverter(from: sourceFormat, to: outputFormat) else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to create converter"])))
+                    return
+                }
+                
+                // Read all frames into a single input buffer
+                let totalFrames = AVAudioFrameCount(file.length)
+                guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: totalFrames) else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to allocate input buffer"])))
+                    return
+                }
+                try file.read(into: inputBuffer)
+                
+                // Convert the full audio to target format
+                let outputFrameCapacity = AVAudioFrameCount(Double(totalFrames) * (Self.chunkSampleRate / sourceSampleRate))
+                guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outputFrameCapacity) else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to allocate output buffer"])))
+                    return
+                }
+                
+                var convError: NSError?
+                let status = converter.convert(to: outputBuffer, error: &convError) { _, outStatus in
+                    outStatus.pointee = .haveData
+                    return inputBuffer
+                }
+                if let err = convError { completion(.failure(err)); return }
+                if status == .error {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 5, userInfo: [NSLocalizedDescriptionKey: "Conversion failed"])))
+                    return
+                }
+                
+                guard let channelData = outputBuffer.int16ChannelData else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 6, userInfo: [NSLocalizedDescriptionKey: "No channel data"])))
+                    return
+                }
+                
+                let totalOutputFrames = Int(outputBuffer.frameLength)
+                let framesPerChunk = Int(Self.chunkSampleRate * chunkDuration)
+                let tempDir = FileManager.default.temporaryDirectory
+                var chunkURLs = [URL]()
+                var offset = 0
+                var chunkIndex = 0
+                
+                while offset < totalOutputFrames {
+                    let count = min(framesPerChunk, totalOutputFrames - offset)
+                    let dataSize = UInt32(count) * 2
+                    var pcmData = Data()
+                    pcmData.append(contentsOf: "RIFF".utf8)
+                    var fileSize = dataSize + 36; pcmData.append(Data(bytes: &fileSize, count: 4))
+                    pcmData.append(contentsOf: "WAVE".utf8)
+                    pcmData.append(contentsOf: "fmt ".utf8)
+                    var fmtSize: UInt32 = 16; pcmData.append(Data(bytes: &fmtSize, count: 4))
+                    var fmtTag: UInt16 = 1; pcmData.append(Data(bytes: &fmtTag, count: 2))
+                    var channels: UInt16 = 1; pcmData.append(Data(bytes: &channels, count: 2))
+                    var sr: UInt32 = UInt32(Self.chunkSampleRate); pcmData.append(Data(bytes: &sr, count: 4))
+                    var byteRate: UInt32 = UInt32(Self.chunkSampleRate) * 2; pcmData.append(Data(bytes: &byteRate, count: 4))
+                    var blockAlign: UInt16 = 2; pcmData.append(Data(bytes: &blockAlign, count: 2))
+                    var bps: UInt16 = 16; pcmData.append(Data(bytes: &bps, count: 2))
+                    pcmData.append(contentsOf: "data".utf8)
+                    var ds = dataSize; pcmData.append(Data(bytes: &ds, count: 4))
+                    let rawPtr = UnsafeRawBufferPointer(start: channelData[0].advanced(by: offset), count: count * 2)
+                    pcmData.append(contentsOf: rawPtr)
+                    let chunkURL = tempDir.appendingPathComponent("parakeet_chunk_\(chunkIndex)_\(UUID().uuidString).wav")
+                    try pcmData.write(to: chunkURL)
+                    chunkURLs.append(chunkURL)
+                    offset += count
+                    chunkIndex += 1
+                }
+                
+                completion(.success(chunkURLs))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
+    /// (Legacy) Converts entire file without chunking — kept for compatibility.
+    private func standardizeAudioForParakeet(sourceURL: URL, completion: @escaping (Result<URL, Error>) -> Void) {
+        let tempDir = FileManager.default.temporaryDirectory
+        let outputURL = tempDir.appendingPathComponent("parakeet_std_\(UUID().uuidString).wav")
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let file = try AVAudioFile(forReading: sourceURL)
+                let format = file.processingFormat
+                
+                guard let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
+                                                       sampleRate: 16000,
+                                                       channels: 1,
+                                                       interleaved: false) else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create output audio format"])))
+                    return
+                }
+                
+                guard let converter = AVAudioConverter(from: format, to: outputFormat) else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to create audio converter"])))
+                    return
+                }
+                
+                let frameCapacity = AVAudioFrameCount(file.length)
+                guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to allocate input buffer"])))
+                    return
+                }
+                
+                try file.read(into: inputBuffer)
+                
+                let outputFrameCapacity = AVAudioFrameCount(Double(frameCapacity) * (outputFormat.sampleRate / format.sampleRate))
+                guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outputFrameCapacity) else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to allocate output buffer"])))
+                    return
+                }
+                
+                var error: NSError?
+                let status = converter.convert(to: outputBuffer, error: &error) { packetCount, outStatus in
+                    outStatus.pointee = .haveData
+                    return inputBuffer
+                }
+                
+                if let err = error {
+                    completion(.failure(err))
+                    return
+                }
+                
+                if status == .error {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 5, userInfo: [NSLocalizedDescriptionKey: "Conversion failed"])))
+                    return
+                }
+                
+                // Construct standard WAV header manually to bypass Extensible generation in AVAudioFile
+                let frameLength = outputBuffer.frameLength
+                guard let channelData = outputBuffer.int16ChannelData else {
+                    completion(.failure(NSError(domain: "ParakeetManager", code: 6, userInfo: [NSLocalizedDescriptionKey: "Failed to get PCM data from buffer"])))
+                    return
+                }
+                
+                let dataSize = UInt32(frameLength) * 2
+                var pcmData = Data()
+                
+                pcmData.append(contentsOf: "RIFF".utf8)
+                var fileSize = dataSize + 36
+                pcmData.append(Data(bytes: &fileSize, count: 4))
+                pcmData.append(contentsOf: "WAVE".utf8)
+                pcmData.append(contentsOf: "fmt ".utf8)
+                
+                var fmtSize: UInt32 = 16
+                pcmData.append(Data(bytes: &fmtSize, count: 4))
+                var formatTag: UInt16 = 1
+                pcmData.append(Data(bytes: &formatTag, count: 2))
+                var channels: UInt16 = 1
+                pcmData.append(Data(bytes: &channels, count: 2))
+                var sampleRate: UInt32 = 16000
+                pcmData.append(Data(bytes: &sampleRate, count: 4))
+                var byteRate: UInt32 = 16000 * 2
+                pcmData.append(Data(bytes: &byteRate, count: 4))
+                var blockAlign: UInt16 = 2
+                pcmData.append(Data(bytes: &blockAlign, count: 2))
+                var bitsPerSample: UInt16 = 16
+                pcmData.append(Data(bytes: &bitsPerSample, count: 2))
+                
+                pcmData.append(contentsOf: "data".utf8)
+                var customDataSize = dataSize
+                pcmData.append(Data(bytes: &customDataSize, count: 4))
+                
+                let byteCount = Int(frameLength) * 2
+                let rawPointer = UnsafeRawBufferPointer(start: channelData[0], count: byteCount)
+                pcmData.append(contentsOf: rawPointer)
+                
+                try pcmData.write(to: outputURL)
+                completion(.success(outputURL))
+                
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+    
     /// Parse the sherpa-onnx-offline stdout output to extract transcription text
-    private func parseOutput(_ output: String) -> String {
+    private func parseSherpaOutput(_ output: String) -> String {
         // sherpa-onnx-offline prints lines but the actual translation is a JSON object.
         // E.g.: {"lang": "", "emotion": "", "event": "", "text": " Hello world", "timestamps": ...
         

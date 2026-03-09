@@ -407,86 +407,116 @@ struct TranscribeFileView: View {
     
     // MARK: - Local File View
     private var localFileView: some View {
-        Button(action: {
-            if !manager.isTranscribing {
-                selectFile()
-            }
-        }) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [8]))
-                    .foregroundColor(isHoveringUpload ? ThemeColors.accent : Color.white.opacity(0.1))
-                    .background(Color.black.opacity(0.2))
-                    .cornerRadius(16)
-                
-                VStack(spacing: 12) {
-                    Image(systemName: manager.isTranscribing ? "hourglass" : "arrow.up.doc")
-                        .font(.system(size: 32))
-                        .foregroundColor(isHoveringUpload && !manager.isTranscribing ? ThemeColors.accent : .white.opacity(0.5))
-                        .symbolEffect(.pulse, options: .repeating, isActive: manager.isTranscribing)
+        VStack(spacing: 12) {
+            Button(action: {
+                if !manager.isTranscribing {
+                    selectFile()
+                }
+            }) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [8]))
+                        .foregroundColor(isHoveringUpload ? ThemeColors.accent : Color.white.opacity(0.1))
+                        .background(Color.black.opacity(0.2))
+                        .cornerRadius(16)
                     
-                    if manager.isTranscribing {
-                        let total = manager.totalInBatch
-                        let remaining = manager.transcriptionQueue.count
-                        let current = total - remaining
-                        Text("Transcribing \(current) of \(total)...")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white)
+                    VStack(spacing: 12) {
+                        Image(systemName: manager.isTranscribing ? "hourglass" : "arrow.up.doc")
+                            .font(.system(size: 32))
+                            .foregroundColor(isHoveringUpload && !manager.isTranscribing ? ThemeColors.accent : .white.opacity(0.5))
+                            .symbolEffect(.pulse, options: .repeating, isActive: manager.isTranscribing)
                         
-                        Text(manager.currentFileName ?? "File")
-                            .font(.system(size: 13, weight: .regular))
-                            .foregroundColor(ThemeColors.secondaryText)
-                            .lineLimit(1)
-                            .padding(.horizontal, 20)
-                    } else {
-                        Text("Click to select audio/video files")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white)
+                        if manager.isTranscribing {
+                            let total = manager.totalInBatch
+                            let remaining = manager.transcriptionQueue.count
+                            let current = total - remaining
+                            Text("Transcribing \(current) of \(total)...")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white)
+                            
+                            Text(manager.currentFileName ?? "File")
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundColor(ThemeColors.secondaryText)
+                                .lineLimit(1)
+                                .padding(.horizontal, 20)
+                        } else {
+                            Text("Click to select audio/video files")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white)
+                        }
+                        
+                        if manager.isTranscribing {
+                            ProgressView()
+                                .progressViewStyle(LinearProgressViewStyle(tint: ThemeColors.accent))
+                                .padding(.horizontal, 60)
+                                .padding(.top, 4)
+                        } else {
+                            Text("MP3, WAV, M4A, MP4")
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
                     }
+                }
+                .frame(height: 160)
+            }
+            .buttonStyle(.plain)
+            .onHover { isHoveringUpload = $0 }
+            .disabled(manager.isTranscribing)
+            .onDrop(of: [.fileURL], isTargeted: $isHoveringUpload) { providers in
+                guard !manager.isTranscribing else { return false }
+                
+                var droppedURLs: [URL] = []
+                let group = DispatchGroup()
+                
+                for provider in providers {
+                    group.enter()
+                    provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
+                        defer { group.leave() }
+                        
+                        guard let data = item as? Data,
+                              let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                            return
+                        }
+                        droppedURLs.append(url)
+                    }
+                }
+                
+                group.notify(queue: .main) {
+                    if !droppedURLs.isEmpty {
+                        self.manager.queueFiles(droppedURLs)
+                    }
+                }
+                
+                return true
+            }
+            
+            // Cancel / Timer row — shown only during transcription
+            if manager.isTranscribing {
+                HStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "clock")
+                        Text("\(manager.currentPhase.isEmpty ? "Transcribing" : manager.currentPhase)... \(timeString(from: manager.elapsedTime))")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.white.opacity(0.2))
+                    .cornerRadius(8)
                     
-                    if manager.isTranscribing {
-                        ProgressView()
-                            .progressViewStyle(LinearProgressViewStyle(tint: ThemeColors.accent))
-                            .padding(.horizontal, 60)
-                            .padding(.top, 4)
-                    } else {
-                        Text("MP3, WAV, M4A, MP4")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.5))
+                    Button(action: {
+                        manager.cancelTranscription()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(Color.red.opacity(0.8))
                     }
+                    .buttonStyle(.plain)
+                    .frame(width: 44, height: 44)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(8)
                 }
             }
-            .frame(height: 160)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHoveringUpload = $0 }
-        .disabled(manager.isTranscribing)
-        .onDrop(of: [.fileURL], isTargeted: $isHoveringUpload) { providers in
-            guard !manager.isTranscribing else { return false }
-            
-            var droppedURLs: [URL] = []
-            let group = DispatchGroup()
-            
-            for provider in providers {
-                group.enter()
-                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
-                    defer { group.leave() }
-                    
-                    guard let data = item as? Data,
-                          let url = URL(dataRepresentation: data, relativeTo: nil) else {
-                        return
-                    }
-                    droppedURLs.append(url)
-                }
-            }
-            
-            group.notify(queue: .main) {
-                if !droppedURLs.isEmpty {
-                    self.manager.queueFiles(droppedURLs)
-                }
-            }
-            
-            return true
         }
     }
     
@@ -591,30 +621,59 @@ struct TranscribeFileView: View {
                             Spacer()
                         }
                         
-                        Button(action: {
-                            startURLTranscription()
-                        }) {
-                            VStack(spacing: 4) {
-                                HStack {
-                                    Image(systemName: manager.isTranscribing ? "hourglass" : "play.fill")
-                                    Text(manager.isTranscribing ? "Transcribing \(md.title?.prefix(15) ?? "Video")..." : "Transcribe Media")
+                        if manager.isTranscribing {
+                            HStack(spacing: 8) {
+                                VStack(spacing: 4) {
+                                    HStack {
+                                        Image(systemName: "hourglass")
+                                        Text("\(manager.currentPhase) \(md.title?.prefix(15) ?? "Video")... \(timeString(from: manager.elapsedTime))")
+                                    }
+                                    if downloadProgress > 0.0 && downloadProgress < 1.0 {
+                                        ProgressView(value: downloadProgress, total: 1.0)
+                                            .progressViewStyle(LinearProgressViewStyle(tint: Color.white))
+                                            .scaleEffect(y: 0.5, anchor: .center)
+                                            .padding(.horizontal, 32)
+                                    }
                                 }
-                                if manager.isTranscribing && downloadProgress > 0.0 && downloadProgress < 1.0 {
-                                    ProgressView(value: downloadProgress, total: 1.0)
-                                        .progressViewStyle(LinearProgressViewStyle(tint: Color.white))
-                                        .scaleEffect(y: 0.5, anchor: .center)
-                                        .padding(.horizontal, 32)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, downloadProgress > 0.0 && downloadProgress < 1.0 ? 8 : 14)
+                                .background(Color.white.opacity(0.2))
+                                .cornerRadius(8)
+                                
+                                Button(action: {
+                                    manager.cancelTranscription()
+                                    // if there was a download it won't be transcribed thanks to safety checks added below
+                                }) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundColor(Color.red.opacity(0.8))
                                 }
+                                .buttonStyle(.plain)
+                                .frame(width: 44, height: 44)
+                                .background(Color.white.opacity(0.1))
+                                .cornerRadius(8)
                             }
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, downloadProgress > 0.0 && downloadProgress < 1.0 ? 8 : 14)
-                            .background(manager.isTranscribing ? Color.white.opacity(0.2) : ThemeColors.accent)
-                            .cornerRadius(8)
+                        } else {
+                            Button(action: {
+                                startURLTranscription()
+                            }) {
+                                VStack(spacing: 4) {
+                                    HStack {
+                                        Image(systemName: "play.fill")
+                                        Text("Transcribe Media")
+                                    }
+                                }
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(ThemeColors.accent)
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(manager.isTranscribing)
                     }
                     .padding()
                     .background(Color.black.opacity(0.2))
@@ -743,6 +802,13 @@ struct TranscribeFileView: View {
         }
     }
     
+    private func timeString(from time: TimeInterval) -> String {
+        let hours = Int(time) / 3600
+        let minutes = Int(time) / 60 % 60
+        let seconds = Int(time) % 60
+        return String(format: "%02i:%02i:%02i", hours, minutes, seconds)
+    }
+    
     private func startURLTranscription() {
         guard let md = metadata else { return }
         let link = urlInput
@@ -750,7 +816,9 @@ struct TranscribeFileView: View {
         manager.isTranscribing = true
         manager.errorMessage = nil
         manager.transcribedText = ""
+        manager.currentPhase = "Downloading"
         manager.currentFileName = "Downloading \(md.title ?? "Media")..."
+        manager.startTimer()
         downloadProgress = 0.0
         
         ytdlpManager.downloadAudio(from: link, onProgress: { progress in
@@ -760,6 +828,10 @@ struct TranscribeFileView: View {
                 self.downloadProgress = 1.0
                 switch result {
                 case .success(let url):
+                    if !manager.isTranscribing { // User cancelled while downloading
+                        try? FileManager.default.removeItem(at: url)
+                        return
+                    }
                     manager.isTranscribing = false
                     manager.currentFileName = md.title ?? "External Media"
                     manager.transcribeFile(url: url)

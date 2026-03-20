@@ -734,10 +734,12 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
     
     /// Transcribe audio with timestamps for meeting mode
-    func transcribeWithTimestamps(audioURL: URL, recordingStartTime: Date, targetLanguage: String? = nil, translateToEnglish: Bool = false, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
+    func transcribeWithTimestamps(audioURL: URL, recordingStartTime: Date, targetLanguage: String? = nil, translateToEnglish: Bool = false, modelOverride: String? = nil, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
+        let activeModelId = modelOverride ?? selectedModelSize
+        
         // Route Parakeet models through ParakeetManager
-        if ParakeetManager.isParakeetModel(selectedModelSize) {
-            ParakeetManager.shared.transcribe(audioURL: audioURL, modelId: selectedModelSize, completion: completion)
+        if ParakeetManager.isParakeetModel(activeModelId) {
+            ParakeetManager.shared.transcribe(audioURL: audioURL, modelId: activeModelId, completion: completion)
             return
         }
         
@@ -747,13 +749,20 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         // Verify model state before proceeding
         verifyModelState()
         
+        guard let activeModel = availableModels.first(where: { $0.id == activeModelId }), activeModel.isAvailable else {
+            completion(.failure(NSError(domain: "WhisperManager", code: 0, userInfo: [NSLocalizedDescriptionKey: "Selected model is not ready or available"])))
+            return
+        }
+        
+        let resolvedModelURL = getModelDirectory().appendingPathComponent(activeModel.fileName)
+        
         guard isReady else {
             completion(.failure(NSError(domain: "WhisperManager", code: 0, userInfo: [NSLocalizedDescriptionKey: "Model is not ready"])))
             return
         }
 
-        // Ensure we have the correct model loaded
-        if preloadedModelSize != selectedModelSize {
+        // Preload in background if this is the globally selected model and it's not preloaded yet
+        if activeModelId == selectedModelSize && preloadedModelSize != selectedModelSize {
             preloadSelectedModel()
         }
 
@@ -761,13 +770,6 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             guard let self = self else { return }
             self.processLock.lock()
             defer { self.processLock.unlock() }
-
-            guard let modelURL = self.preloadedModel else {
-                DispatchQueue.main.async {
-                    completion(.failure(NSError(domain: "WhisperManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Model not preloaded"])))
-                }
-                return
-            }
 
             // Create a temporary directory for this transcription
             let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("whisper_\(UUID().uuidString)")
@@ -784,7 +786,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
             // Configure arguments for timestamped output (SRT format for easy parsing)
             var arguments = [
-                "-m", modelURL.path,
+                "-m", resolvedModelURL.path,
                 "-osrt",  // Output SRT format for timestamps
                 "-of", outputFile.path
             ]

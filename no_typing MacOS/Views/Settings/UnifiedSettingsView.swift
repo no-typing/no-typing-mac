@@ -64,7 +64,7 @@ struct UnifiedSettingsView: View {
                 // Window control spacing
                     Spacer().frame(height: 30)
                     
-                    ScrollView(showsIndicators: false) {
+                    ScrollView {
                         VStack(spacing: 8) {
                             ForEach(SettingsSection.allCases, id: \.self) { section in
                                 sidebarItem(for: section)
@@ -77,7 +77,7 @@ struct UnifiedSettingsView: View {
                     Spacer()
                 }
                 .frame(width: 90)
-                .background(ThemeColors.sidebarBackground)
+                .background(audioManager.isRecordingEnabled ? ThemeColors.sidebarBackground : ThemeColors.sidebarBackgroundDisabled)
             
             // MARK: - Main Content Area
             VStack(spacing: 0) {
@@ -118,13 +118,67 @@ struct UnifiedSettingsView: View {
                     }
                     
                     Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "mic.fill")
+                            .foregroundColor(audioManager.isRecordingEnabled ? .green : .red)
+                        Text("Recorder")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white)
+                        Toggle("", isOn: $audioManager.isRecordingEnabled)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                            .scaleEffect(0.8)
+                    }
+                    .padding(.trailing, 16)
+                    .help("Enable or disable global recording hotkeys")
+
+                    Button(action: {
+                        if let url = URL(string: "https://no-typing.com/buy-pro") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Text("⭐")
+                                .font(.system(size: 16))
+                            Text("Upgrade to Pro")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 0.4, green: 0.6, blue: 1.0),  // Soft blue
+                                    Color(red: 0.8, green: 0.4, blue: 0.9),  // Purple-pink
+                                    Color(red: 1.0, green: 0.4, blue: 0.6)   // Pink-red
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .foregroundColor(.white)
+                        .cornerRadius(20)
+                        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .onHover { hovering in
+                        if hovering {
+                            NSCursor.pointingHand.push()
+                        } else {
+                            NSCursor.pop()
+                        }
+                    }
                 }
-                .padding(.leading, 32)
-                .padding(.top, 24)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 24)
                 // We use clear background here to let the main content background show through
                 
-                ScrollView(showsIndicators: false) {
+                ScrollView {
                     VStack(spacing: 32) {
                         switch selectedSection {
                         case .recentActivity:
@@ -200,21 +254,41 @@ struct UnifiedSettingsView: View {
                 .contentShape(Rectangle())
                 
                 if section == .transcribe {
-                    Text("NEW")
+                    Text("⭐ PRO")
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
-                        .background(Color(hex: "05b523"))
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 0.4, green: 0.6, blue: 1.0),  // Soft blue
+                                    Color(red: 0.8, green: 0.4, blue: 0.9),  // Purple-pink
+                                    Color(red: 1.0, green: 0.4, blue: 0.6)   // Pink-red
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .cornerRadius(4)
                         .offset(x: 5, y: -4)
                 } else if section == .magicActions {
-                    Text("HOT")
+                    Text("⭐ PRO")
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
-                        .background(Color.red)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 0.4, green: 0.6, blue: 1.0),  // Soft blue
+                                    Color(red: 0.8, green: 0.4, blue: 0.9),  // Purple-pink
+                                    Color(red: 1.0, green: 0.4, blue: 0.6)   // Pink-red
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .cornerRadius(4)
                         .offset(x: 5, y: -4)
                 } else if hasWarning {

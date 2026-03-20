@@ -7,6 +7,12 @@ struct ThemeColors {
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
+    static let sidebarBackgroundDisabled = LinearGradient(
+        gradient: Gradient(colors: [Color(red: 120/255, green: 30/255, blue: 35/255), 
+                                    Color(red: 80/255, green: 15/255, blue: 20/255)]),
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
     
     static let contentBackground = LinearGradient(
         gradient: Gradient(colors: [Color(red: 15/255, green: 25/255, blue: 50/255), Color(red: 10/255, green: 15/255, blue: 30/255)]),

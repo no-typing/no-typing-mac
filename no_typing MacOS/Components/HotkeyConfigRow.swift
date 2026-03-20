@@ -44,7 +44,7 @@ struct HotkeyConfigRow: View {
                             .background(Color(NSColor.windowBackgroundColor))
                             .clipShape(Circle())
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                     .padding(.trailing, 4)
                 }
             }

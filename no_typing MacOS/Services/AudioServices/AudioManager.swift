@@ -63,6 +63,14 @@ class AudioManager: ObservableObject {
             }
         }
     }
+    
+    @Published var isRecordingEnabled: Bool = UserDefaults.standard.object(forKey: "isGlobalRecordingEnabled") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(isRecordingEnabled, forKey: "isGlobalRecordingEnabled")
+            UserDefaults.standard.synchronize()
+        }
+    }
+    
     @Published private(set) var isAudioSetupInProgress: Bool = false
     @Published private(set) var isStoppingRecording = false
     @Published private(set) var isSpeechDetected = false

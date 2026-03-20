@@ -87,7 +87,7 @@ struct MagicActionsView: View {
                         .background(Color.accentColor)
                         .cornerRadius(6)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                     
                     Spacer()
                 }
@@ -203,7 +203,7 @@ struct ReplacementRow: View {
                                 .fill(isHovered ? Color.white.opacity(0.1) : Color.clear)
                         )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(.plain)
                 
                 Button(action: onDelete) {
                     Image(systemName: "trash")
@@ -215,7 +215,7 @@ struct ReplacementRow: View {
                                 .fill(isHovered ? Color.red.opacity(0.1) : Color.clear)
                         )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .buttonStyle(.plain)
             }
             .opacity(isHovered ? 1 : 0.6)
         }
@@ -293,7 +293,7 @@ struct ReplacementEditSheet: View {
                             .frame(width: 28, height: 28)
                             .background(Circle().fill(Color.secondary.opacity(0.1)))
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 20)
@@ -332,7 +332,7 @@ struct ReplacementEditSheet: View {
                                                 .font(.system(size: 16))
                                                 .foregroundColor(.red.opacity(0.8))
                                         }
-                                        .buttonStyle(PlainButtonStyle())
+                                        .buttonStyle(.plain)
                                     }
                                 }
                             }
@@ -349,7 +349,7 @@ struct ReplacementEditSheet: View {
                             }
                             .padding(.vertical, 8)
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
                     }
                     .padding(20)
                     .background(sectionBackgroundColor)
@@ -404,7 +404,7 @@ struct ReplacementEditSheet: View {
                     .background(Color.secondary.opacity(0.1))
                     .cornerRadius(6)
                     .foregroundColor(.secondary)
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                     
                     Button("Save") {
                         saveReplacement()
@@ -416,7 +416,7 @@ struct ReplacementEditSheet: View {
                     .cornerRadius(6)
                     .foregroundColor(.white)
                     .disabled(!canSave)
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)

@@ -13,12 +13,17 @@ class FileTranscriptionManager: ObservableObject {
     @Published var currentPhase: String = ""
     
     @Published var elapsedTime: TimeInterval = 0
+    @Published var lastTranscriptionDuration: TimeInterval = 0
     private var timer: Timer?
     private var isCancelled: Bool = false
     
     @Published var transcriptionQueue: [URL] = []
     @Published var totalInBatch: Int = 0
     @Published var translateToEnglish: Bool = false
+    
+    @Published var selectedLocalModel: String = UserDefaults.standard.string(forKey: "fileTranscriptionLocalModel") ?? "small" {
+        didSet { UserDefaults.standard.set(selectedLocalModel, forKey: "fileTranscriptionLocalModel") }
+    }
     
     @Published var useCloudEngine: Bool = false
     @Published var cloudProvider: CloudTranscriptionProvider = .deepgram
@@ -48,6 +53,128 @@ class FileTranscriptionManager: ObservableObject {
         let url = transcriptionQueue.removeFirst()
         transcribeFile(url: url)
     }
+    
+    // MARK: - Podcast Multi-Track (labeled per host)
+    
+    /// Transcribes each track individually and formats the result as:
+    ///   [Speaker]\n<text>\n\n[Speaker]\n<text>\n\n...
+    func transcribePodcastTracks(_ trackURLs: [URL], speakerNames: [String] = []) {
+        guard !isTranscribing else { return }
+        
+        isCancelled = false
+        isTranscribing = true
+        errorMessage = nil
+        transcribedText = ""
+        wordCount = 0
+        currentPhase = "Transcribing"
+        currentFileName = trackURLs.first?.lastPathComponent
+        totalInBatch = trackURLs.count
+        startTimer()
+        
+        NotificationManager.shared.requestAuthorization()
+        
+        // Kick off recursive per-track processing
+        transcribeNextPodcastTrack(trackURLs: trackURLs, speakerNames: speakerNames, index: 0, results: [])
+    }
+    
+    private func transcribeNextPodcastTrack(trackURLs: [URL], speakerNames: [String], index: Int, results: [String]) {
+        guard !isCancelled else { return }
+        
+        if index >= trackURLs.count {
+            // Build (label, text) pairs
+            let pairs: [(String, String)] = results.enumerated().map { i, text in
+                let label = (i < speakerNames.count && !speakerNames[i].trimmingCharacters(in: .whitespaces).isEmpty)
+                    ? speakerNames[i]
+                    : "Host \(i + 1)"
+                return (label, text)
+            }
+            
+            // Merge consecutive segments that share the same speaker
+            var merged: [(String, String)] = []
+            for (label, text) in pairs {
+                if let last = merged.last, last.0 == label {
+                    merged[merged.count - 1] = (label, last.1 + "\n\n" + text)
+                } else {
+                    merged.append((label, text))
+                }
+            }
+            
+            let formatted = merged.map { label, text in
+                "[\(label)]\n\(text)"
+            }.joined(separator: "\n\n")
+            
+            DispatchQueue.main.async {
+                self.transcribedText = formatted
+                let words = formatted.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+                self.wordCount = words.count
+                self.isTranscribing = false
+                self.stopTimerSavingDuration()
+                self.currentFileName = nil
+                self.currentPhase = ""
+                self.totalInBatch = 0
+                
+                if !formatted.isEmpty {
+                    TranscriptionHistoryManager.shared.addTranscription(
+                        formatted,
+                        duration: 0,
+                        segments: [],
+                        sourceMediaData: nil
+                    )
+                }
+                NotificationManager.shared.sendNotification(
+                    title: "Podcast Transcription Completed",
+                    body: "Transcribed \(trackURLs.count) tracks."
+                )
+            }
+            return
+        }
+        
+        let trackURL = trackURLs[index]
+        let speakerLabel = (index < speakerNames.count && !speakerNames[index].trimmingCharacters(in: .whitespaces).isEmpty)
+            ? speakerNames[index]
+            : "Host \(index + 1)"
+        DispatchQueue.main.async {
+            self.currentFileName = trackURL.lastPathComponent
+            self.currentPhase = "Transcribing \(speakerLabel) (\(index + 1) of \(trackURLs.count))"
+        }
+        
+        convertTo16kHzWav(sourceURL: trackURL) { [weak self] conversionResult in
+            guard let self = self, !self.isCancelled else { return }
+            switch conversionResult {
+            case .success(let wavURL):
+                WhisperManager.shared.transcribeWithTimestamps(
+                    audioURL: wavURL,
+                    recordingStartTime: Date(),
+                    targetLanguage: nil,
+                    translateToEnglish: self.translateToEnglish,
+                    modelOverride: self.selectedLocalModel
+                ) { result in
+                    try? FileManager.default.removeItem(at: wavURL)
+                    guard !self.isCancelled else { return }
+                    
+                    var hostText = ""
+                    if case .success(let segments) = result {
+                        hostText = segments.map { $0.text }.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    // Continue to next track (even if this one failed/empty)
+                    self.transcribeNextPodcastTrack(
+                        trackURLs: trackURLs,
+                        speakerNames: speakerNames,
+                        index: index + 1,
+                        results: results + [hostText]
+                    )
+                }
+            case .failure:
+                // Skip failed track, continue
+                self.transcribeNextPodcastTrack(
+                    trackURLs: trackURLs,
+                    speakerNames: speakerNames,
+                    index: index + 1,
+                    results: results + [""]
+                )
+            }
+        }
+    }
 
     func transcribeFile(url: URL) {
         guard !isTranscribing else { return }
@@ -76,12 +203,13 @@ class FileTranscriptionManager: ObservableObject {
                     audioURL: wavURL,
                     recordingStartTime: Date(),
                     targetLanguage: nil,
-                    translateToEnglish: self?.translateToEnglish ?? false
+                    translateToEnglish: self?.translateToEnglish ?? false,
+                    modelOverride: self?.selectedLocalModel
                 ) { result in
                     DispatchQueue.main.async {
                         if self?.isCancelled == true { return }
                         self?.isTranscribing = false
-                        self?.stopTimer()
+                        self?.stopTimerSavingDuration()
                         self?.currentFileName = nil
                         
                         // Clean up the temporary wav file
@@ -146,7 +274,7 @@ class FileTranscriptionManager: ObservableObject {
                 DispatchQueue.main.async {
                     if self?.isCancelled == true { return }
                     self?.isTranscribing = false
-                    self?.stopTimer()
+                    self?.stopTimerSavingDuration()
                     self?.currentFileName = nil
                     self?.errorMessage = "Failed to convert audio format: \(error.localizedDescription)"
                     NotificationManager.shared.sendNotification(
@@ -219,7 +347,7 @@ class FileTranscriptionManager: ObservableObject {
                     )
                     
                     self.isTranscribing = false
-                    self.stopTimer()
+                    self.stopTimerSavingDuration()
                     self.currentFileName = nil
                     self.processNextIfAvailable()
                 }
@@ -227,7 +355,7 @@ class FileTranscriptionManager: ObservableObject {
                 await MainActor.run {
                     if self.isCancelled { return }
                     self.isTranscribing = false
-                    self.stopTimer()
+                    self.stopTimerSavingDuration()
                     self.currentFileName = nil
                     self.errorMessage = error.localizedDescription
                     NotificationManager.shared.sendNotification(
@@ -264,6 +392,11 @@ class FileTranscriptionManager: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.elapsedTime += 1
         }
+    }
+    
+    func stopTimerSavingDuration() {
+        lastTranscriptionDuration = elapsedTime
+        stopTimer()
     }
     
     private func stopTimer() {

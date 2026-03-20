@@ -1,12 +1,24 @@
 import SwiftUI
 
+enum FeedbackType: String, CaseIterable, Identifiable {
+    case bugReport = "Bug Report"
+    case featureRequest = "Feature Request"
+    case generalFeedback = "General Feedback"
+    
+    var id: String { self.rawValue }
+}
+
 struct SupportView: View {
+    @State private var feedbackType: FeedbackType = .generalFeedback
     @State private var feedbackText = ""
+    @State private var stepsToReproduce = ""
+    @State private var attachLogs = true
+    
     @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header Section with Buy Me a Coffee button
+        VStack(alignment: .leading, spacing: 24) { 
+            // Header Section
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Help & Feedback")
@@ -16,191 +28,186 @@ struct SupportView: View {
                     
                     Text("Got questions or suggestions? Let us know!")
                         .font(.body)
-                        .foregroundColor(ThemeColors.secondaryText)
                 }
+            }
+            Divider()
+            
+            // Type Selection
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Feedback Type")
+                    .font(.headline)
+                    .foregroundColor(ThemeColors.secondaryText)
                 
-                Spacer()
-                
-                // Buy Me a Coffee button
-                Button(action: {
-                    if let url = URL(string: "https://buymeacoffee.com/liamadsr") {
-                        NSWorkspace.shared.open(url)
+                Picker("", selection: $feedbackType) {
+                    ForEach(FeedbackType.allCases) { type in
+                        Text(type.rawValue).tag(type)
                     }
-                }) {
-                    HStack(spacing: 6) {
-                        Text("☕️")
-                            .font(.system(size: 18))
-                        Text("Buy Me a Coffee")
-                            .font(.system(size: 15, weight: .medium))
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+            }
+            
+            // Description
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Description")
+                    .font(.headline)
+                    .foregroundColor(ThemeColors.secondaryText)
+                
+                descriptionHelperText()
+                    .font(.subheadline)
+                    .foregroundColor(ThemeColors.secondaryText)
+                    .padding(.bottom, 4)
+                
+                ZStack(alignment: .bottomTrailing) {
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $feedbackText)
+                            .font(.system(.body))
+                            .frame(height: 180)
+                            .padding(8)
+                            .background(Color(NSColor.textBackgroundColor))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                            )
+                        
+                        if feedbackText.isEmpty {
+                            Text(descriptionPlaceholder())
+                                .foregroundColor(ThemeColors.secondaryText.opacity(0.5))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 16)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    
+                    Text("\(feedbackText.count)/50")
+                        .font(.caption)
+                        .foregroundColor(feedbackText.count < 50 ? .red.opacity(0.7) : ThemeColors.secondaryText)
+                        .padding(12)
+                }
+            }
+            
+            // Steps to Reproduce (Only for Bug Report)
+            if feedbackType == .bugReport {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Steps to Reproduce")
+                        .font(.headline)
+                        .foregroundColor(ThemeColors.secondaryText)
+                    
+                    ZStack(alignment: .bottomTrailing) {
+                        ZStack(alignment: .topLeading) {
+                            TextEditor(text: $stepsToReproduce)
+                                .font(.system(.body))
+                                .frame(height: 100)
+                                .padding(8)
+                                .background(Color(NSColor.textBackgroundColor))
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                                )
+                            
+                            if stepsToReproduce.isEmpty {
+                                Text("Please list the steps to reproduce the issue")
+                                    .foregroundColor(ThemeColors.secondaryText.opacity(0.5))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 16)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        
+                        Text("\(stepsToReproduce.count)/20")
+                            .font(.caption)
+                            .foregroundColor(stepsToReproduce.count < 20 ? .red.opacity(0.7) : ThemeColors.secondaryText)
+                            .padding(12)
+                    }
+                }
+            }
+            
+            // Attach Logs Checkbox
+            Toggle(isOn: $attachLogs) {
+                Text("Attach No-Typing app logs")
+                    .foregroundColor(.white)
+            }
+            .toggleStyle(.checkbox)
+            .padding(.top, 8)
+            
+            HStack {
+                Spacer()
+                Button(action: sendFeedback) {
+                    HStack {
+                        Image(systemName: "paperplane.fill")
+                        Text("Send Feedback")
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(red: 0.4, green: 0.6, blue: 1.0),  // Soft blue
-                                Color(red: 0.8, green: 0.4, blue: 0.9),  // Purple-pink
-                                Color(red: 1.0, green: 0.4, blue: 0.6)   // Pink-red
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .foregroundColor(.white)
-                    .cornerRadius(20)
-                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
-                    )
                 }
-                .buttonStyle(PlainButtonStyle())
-                .onHover { hovering in
-                    if hovering {
-                        NSCursor.pointingHand.push()
-                    } else {
-                        NSCursor.pop()
-                    }
-                }
-            }
-            
-            // Contact Cards
-            HStack(spacing: 12) {
-                // Direct Contact Card
-                let directContactCard = HStack(spacing: 12) {
-                    // Left side with icon and text
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.blue.opacity(0.1))
-                                .frame(width: 40, height: 40)
-                            
-                            Image(systemName: "envelope")
-                                .font(.system(size: 18))
-                                .foregroundColor(.blue)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Direct Contact")
-                                .font(.title3)
-                                .foregroundColor(.white)
-                            Text("liam@no_typing.ai")
-                                .font(.title3)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    // Copy button on the right
-                    Button(action: {
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString("liam@no_typing.ai", forType: .string)
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "doc.on.doc")
-                            Text("Copy")
-                        }
-                        .font(.system(.body, weight: .medium))
-                        .foregroundColor(.blue)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(6)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("Copy email address")
-                }
-                .padding(.vertical, 12)
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-
-                Button(action: {
-                    if let emailURL = URL(string: "mailto:liam@no_typing.ai") {
-                        NSWorkspace.shared.open(emailURL)
-                    }
-                }) {
-                    directContactCard
-                }
-                .buttonStyle(HoverButtonStyle())
-                
-                // Response Time Card
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.green.opacity(0.1))
-                            .frame(width: 40, height: 40)
-                        
-                        Image(systemName: "clock")
-                            .font(.system(size: 18))
-                            .foregroundColor(.green)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Response Time")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                        Text("24 Hours")
-                            .font(.title3)
-                            .foregroundColor(ThemeColors.secondaryText)
-                    }
-                }
-                .padding(.vertical, 12)
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(8)
-            }
-            
-            Divider()
-            
-            // Feedback Form Section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Send Feedback")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Text("Your feedback helps us improve No-Typing for everyone")
-                    .font(.subheadline)
-                    .foregroundColor(ThemeColors.secondaryText)
-                
-                TextEditor(text: $feedbackText)
-                    .font(.system(.body))
-                    .frame(height: 100)
-                    .padding(8)
-                    .background(Color(NSColor.textBackgroundColor))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                    )
-                
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        if let emailURL = URL(string: "mailto:liam@no_typing.ai?subject=No-Typing%20Feedback&body=\(feedbackText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
-                            NSWorkspace.shared.open(emailURL)
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "paperplane.fill")
-                            Text("Send Feedback")
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                    .disabled(feedbackText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+                .disabled(!isFormValid())
             }
         }
+        .padding(.top, 16)
         .background(Color.clear)
+    }
+    
+    private func isFormValid() -> Bool {
+        if feedbackText.trimmingCharacters(in: .whitespacesAndNewlines).count < 50 {
+            return false
+        }
+        if feedbackType == .bugReport && stepsToReproduce.trimmingCharacters(in: .whitespacesAndNewlines).count < 20 {
+            return false
+        }
+        return true
+    }
+    
+    @ViewBuilder
+    private func descriptionHelperText() -> some View {
+        switch feedbackType {
+        case .bugReport:
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Please describe the issue in detail. The more actionable your feedback, the quicker our team can address your request. Some helpful information includes:")
+                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Steps to reproduce the issue") }
+                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Expected behavior") }
+                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Actual behavior") }
+                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Any error messages") }
+                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Any relevant information") }
+            }
+        case .featureRequest:
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Please describe the feature you'd like to see. The more detailed the requirements, the easier it will be for our team to incorporate your ideas. Some helpful information includes:")
+                HStack(alignment: .top, spacing: 4) { Text("•"); Text("What is missing in your workflow") }
+                HStack(alignment: .top, spacing: 4) { Text("•"); Text("What you would like to see to address this gap in your workflow") }
+                HStack(alignment: .top, spacing: 4) { Text("•"); Text("How this feature would help you and other users") }
+            }
+        case .generalFeedback:
+            Text("For any feedback that does not fit into the above categories.")
+        }
+    }
+    
+    private func descriptionPlaceholder() -> String {
+        switch feedbackType {
+        case .bugReport: return "Describe the bug you encountered..."
+        case .featureRequest: return "Describe the feature you would like to see..."
+        case .generalFeedback: return "Enter your feedback here..."
+        }
+    }
+    
+    private func sendFeedback() {
+        var body = "Type: \(feedbackType.rawValue)\n\n"
+        body += "Description:\n\(feedbackText)\n\n"
+        if feedbackType == .bugReport {
+            body += "Steps to Reproduce:\n\(stepsToReproduce)\n\n"
+        }
+        body += "Attach Logs: \(attachLogs ? "Yes" : "No")"
+        
+        if let emailURL = URL(string: "mailto:liam@no_typing.ai?subject=No-Typing%20Feedback&body=\(body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
+            NSWorkspace.shared.open(emailURL)
+        }
     }
 }
 
+// Keeping HoverButtonStyle for compatibility if it's used elsewhere, although no longer strictly required by SupportView currently.
 struct HoverButtonStyle: ButtonStyle {
     @State private var isHovered = false
     
@@ -219,4 +226,4 @@ struct HoverButtonStyle: ButtonStyle {
             }
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
     }
-} 
+}

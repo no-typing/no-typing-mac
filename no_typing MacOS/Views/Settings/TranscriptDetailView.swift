@@ -20,10 +20,12 @@ struct TranscriptDetailView: View {
     @State private var translationLanguage = "DE"
     
     var onUpdate: (TranscriptionHistoryItem) -> Void
+    var onClose: (() -> Void)?
     
-    init(item: TranscriptionHistoryItem, onUpdate: @escaping (TranscriptionHistoryItem) -> Void) {
+    init(item: TranscriptionHistoryItem, onUpdate: @escaping (TranscriptionHistoryItem) -> Void, onClose: (() -> Void)? = nil) {
         self._item = State(initialValue: item)
         self.onUpdate = onUpdate
+        self.onClose = onClose
         
         let initialSegments = item.segments ?? []
         self._localSegments = State(initialValue: initialSegments)
@@ -111,7 +113,13 @@ struct TranscriptDetailView: View {
     // MARK: - Header
     private var headerView: some View {
         HStack {
-            Button(action: { presentationMode.wrappedValue.dismiss() }) {
+            Button(action: { 
+                if let onClose = onClose {
+                    onClose()
+                } else {
+                    presentationMode.wrappedValue.dismiss() 
+                }
+            }) {
                 Image(systemName: "chevron.left")
                 Text("Back")
             }

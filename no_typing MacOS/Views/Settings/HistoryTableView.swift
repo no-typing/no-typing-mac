@@ -73,39 +73,19 @@ struct HistoryTableView: View {
     
     var body: some View {
         if let selectedItem = selectedItemForDetail {
-            TranscriptDetailView(item: selectedItem) { updatedItem in
+            TranscriptDetailView(item: selectedItem, onUpdate: { updatedItem in
                 // Sync the update down to the global manager
                 historyManager.updateTranscription(updatedItem)
                 
                 // Allow the view to update
                 selectedItemForDetail = updatedItem
-            }
+            }, onClose: {
+                withAnimation(.spring()) {
+                    selectedItemForDetail = nil
+                }
+            })
             // Animate transition back to table
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
-            .overlay(alignment: .topLeading) {
-                // Intercept the default 'Back' button behavior of TranscriptDetailView
-                // by replacing its dismiss action with our own router logic.
-                // We do this by placing an invisible button over it, or just 
-                // having TranscriptDetailView use a custom dismissal closure,
-                // but for simplicity we'll just add a "Close" button here.
-                Button(action: {
-                    withAnimation(.spring()) {
-                        selectedItemForDetail = nil
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                    }
-                }
-                .buttonStyle(PlainButtonStyle())
-                .foregroundColor(.blue)
-                .padding()
-                .background(Color(nsColor: .controlBackgroundColor))
-                // Only show if we actually need a back button overlay, but TranscriptDetailView has one.
-                // We'll trust TranscriptDetailView's built-in header, but we need
-                // a way for it to tell us to close. Let's pass a binding instead.
-            }
         } else {
             tableView
                 .transition(.opacity.combined(with: .scale(scale: 0.98)))
@@ -302,7 +282,7 @@ struct HistoryTableView: View {
 
 struct HistoryTableRow: View {
     let item: TranscriptionHistoryItem
-    var onTap: () -> Void
+    var onPlay: () -> Void
     
     @State private var isHovered = false
     
@@ -321,14 +301,21 @@ struct HistoryTableRow: View {
             Text(item.formattedFullDate)
                 .font(.system(size: 13))
                 .foregroundColor(ThemeColors.secondaryText)
-                .frame(width: 170, alignment: .trailing)
+                .frame(width: 140, alignment: .trailing)
+                
+            Button(action: onPlay) {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(isHovered ? .blue : .blue.opacity(0.8))
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 8)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
         .background(isHovered ? Color.white.opacity(0.05) : Color.clear)
         .cornerRadius(6)
         .contentShape(Rectangle()) // Makes the whole row clickable
-        .onTapGesture(perform: onTap)
         .onHover { hovering in
             isHovered = hovering
         }

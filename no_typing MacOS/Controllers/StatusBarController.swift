@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 class StatusBarController: NSObject, ObservableObject {
     private var statusBar: NSStatusBar?
@@ -11,6 +12,7 @@ class StatusBarController: NSObject, ObservableObject {
     private var settingsItem: NSMenuItem?
     private var settingsWindow: NSWindow?
     private var settingsWindowController: NSWindowController?
+    private var cancellables = Set<AnyCancellable>()
     
     private var appDelegate: AppDelegate? {
         return NSApp.delegate as? AppDelegate
@@ -30,6 +32,13 @@ class StatusBarController: NSObject, ObservableObject {
                 name: NSNotification.Name("ShowSettingsWindow"),
                 object: nil
             )
+            
+            self.audioManager.$isRecordingEnabled
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] isEnabled in
+                    self?.updateIcon(isEnabled: isEnabled)
+                }
+                .store(in: &self.cancellables)
         }
     }
     
@@ -44,11 +53,9 @@ class StatusBarController: NSObject, ObservableObject {
     
     private func setupStatusBarButton() {
         if let statusBarButton = statusItem?.button {
-            // Load the custom icon
-            if let icon = NSImage(named: "StatusBarIcon") {
-                // Ensure it's treated as a template image
+            // Load the enabled custom icon by default
+            if let icon = NSImage(named: "StatusBarIconEnabled") {
                 icon.isTemplate = true
-                // Set the icon size to 16x16 for proper status bar fit
                 icon.size = NSSize(width: 16, height: 16)
                 statusBarButton.image = icon
             }
@@ -59,6 +66,30 @@ class StatusBarController: NSObject, ObservableObject {
             
             // Enable right-click detection
             statusBarButton.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+    }
+    
+    private func updateIcon(isEnabled: Bool) {
+        if let statusBarButton = statusItem?.button {
+            if isEnabled {
+                statusBarButton.contentTintColor = nil
+                
+                // Load the enabled icon
+                if let originalIcon = NSImage(named: "StatusBarIconEnabled") {
+                    originalIcon.isTemplate = true
+                    originalIcon.size = NSSize(width: 16, height: 16)
+                    statusBarButton.image = originalIcon
+                }
+            } else {
+                statusBarButton.contentTintColor = nil
+                
+                // Load the disabled icon
+                if let disabledIcon = NSImage(named: "StatusBarIconDisabled") {
+                    disabledIcon.isTemplate = true
+                    disabledIcon.size = NSSize(width: 16, height: 16)
+                    statusBarButton.image = disabledIcon
+                }
+            }
         }
     }
     

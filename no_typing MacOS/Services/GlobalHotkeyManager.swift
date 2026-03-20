@@ -243,6 +243,12 @@ class GlobalHotkeyManager: ObservableObject {
             let newlyPressedFlags = flags.subtracting(lastFlags)
             
             if !newlyPressedFlags.isEmpty || (flags.rawValue != 0 && hudState == .hidden) {
+                // If global recording is disabled, don't trigger hotkeys
+                if !audioManager.isRecordingEnabled {
+                    previousFlags = flags
+                    return Unmanaged.passRetained(event)
+                }
+                
                 // Check for matching hotkey and ensure it's enabled
                 // We also allow checking even when no new flags are pressed if we're in hidden state
                 // This helps recover from scenarios where key release events were missed
@@ -409,6 +415,10 @@ class GlobalHotkeyManager: ObservableObject {
         
         // Regular hotkey handling for key press events
         if type == .keyDown {
+            if !audioManager.isRecordingEnabled {
+                return Unmanaged.passRetained(event)
+            }
+            
             if let config = hotkeyManager.findConfigurationForKeyCombo(modifiers: flags.rawValue, keyCode: keyCode),
                config.isEnabled {
                 

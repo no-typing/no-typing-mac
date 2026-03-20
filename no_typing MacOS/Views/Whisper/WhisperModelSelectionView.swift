@@ -462,73 +462,73 @@ struct WhisperModelSelectionView: View {
                             )
                         }
                         
-                        Divider()
-                            .padding(.vertical, 8)
+                        // Divider()
+                        //     .padding(.vertical, 8)
                         
-                        // Transcription Mode and Settings
-                        VStack(alignment: .leading, spacing: 12) {
-                            // Mode Selection
-                            SettingsToggleRow(
-                                icon: audioManager.isStreamingMode ? "waveform.badge.plus" : "square.stack.3d.up",
-                                title: "Streaming Mode",
-                                isOn: Binding(
-                                    get: { audioManager.isStreamingMode },
-                                    set: { _ in audioManager.toggleTranscriptionMode() }
-                                ),
-                                iconGradient: LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            )
+                        // // Transcription Mode and Settings
+                        // VStack(alignment: .leading, spacing: 12) {
+                        //     // Mode Selection
+                        //     SettingsToggleRow(
+                        //         icon: audioManager.isStreamingMode ? "waveform.badge.plus" : "square.stack.3d.up",
+                        //         title: "Streaming Mode",
+                        //         isOn: Binding(
+                        //             get: { audioManager.isStreamingMode },
+                        //             set: { _ in audioManager.toggleTranscriptionMode() }
+                        //         ),
+                        //         iconGradient: LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        //     )
                             
-                            Text(audioManager.isStreamingMode ? 
-                                 "Text appears in real-time as you speak" : 
-                                 "Text is accumulated during recording and processed simultaneously when you finish, then inserted as a single chunk")
-                                .font(.subheadline)
-                                .foregroundColor(ThemeColors.secondaryText)
-                                .padding(.leading, 12)
+                        //     Text(audioManager.isStreamingMode ? 
+                        //          "Text appears in real-time as you speak" : 
+                        //          "Text is accumulated during recording and processed simultaneously when you finish, then inserted as a single chunk")
+                        //         .font(.subheadline)
+                        //         .foregroundColor(ThemeColors.secondaryText)
+                        //         .padding(.leading, 12)
                             
-                            // Pause Detection Duration (only show in streaming mode)
-                            if audioManager.isStreamingMode {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "timer")
-                                            .font(.system(size: 14))
-                                            .foregroundColor(.blue)
-                                        Text("Pause Detection")
-                                            .font(.body)
-                                            .foregroundColor(.white)
-                                    }
+                        //     // Pause Detection Duration (only show in streaming mode)
+                        //     if audioManager.isStreamingMode {
+                        //         VStack(alignment: .leading, spacing: 12) {
+                        //             HStack(spacing: 8) {
+                        //                 Image(systemName: "timer")
+                        //                     .font(.system(size: 14))
+                        //                     .foregroundColor(.blue)
+                        //                 Text("Pause Detection")
+                        //                     .font(.body)
+                        //                     .foregroundColor(.white)
+                        //             }
                                     
-                                    Text("Longer pauses provide better accuracy. Shorter segments may reduce quality.")
-                                        .font(.subheadline)
-                                        .foregroundColor(ThemeColors.secondaryText)
+                        //             Text("Longer pauses provide better accuracy. Shorter segments may reduce quality.")
+                        //                 .font(.subheadline)
+                        //                 .foregroundColor(ThemeColors.secondaryText)
                                     
-                                    let thresholds: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 8) {
-                                            ForEach(thresholds, id: \.self) { threshold in
-                                                RadioGridCard(
-                                                    title: "\(String(format: "%g", threshold))s",
-                                                    icon: nil,
-                                                    iconGradient: nil,
-                                                    isSelected: self.pauseDetectionThreshold == threshold
-                                                ) {
-                                                    self.pauseDetectionThreshold = threshold
-                                                }
-                                            }
-                                        }
-                                        .padding(.vertical, 4)
-                                    }
-                                }
-                                .padding(.leading, 12)
-                                .onChange(of: pauseDetectionThreshold) { newValue in
-                                    // Notify the speech recognizer of the change
-                                    NotificationCenter.default.post(
-                                        name: NSNotification.Name("PauseDetectionThresholdChanged"),
-                                        object: nil,
-                                        userInfo: ["threshold": newValue]
-                                    )
-                                }
-                            }
-                        }
+                        //             let thresholds: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]
+                        //             ScrollView(.horizontal, showsIndicators: false) {
+                        //                 HStack(spacing: 8) {
+                        //                     ForEach(thresholds, id: \.self) { threshold in
+                        //                         RadioGridCard(
+                        //                             title: "\(String(format: "%g", threshold))s",
+                        //                             icon: nil,
+                        //                             iconGradient: nil,
+                        //                             isSelected: self.pauseDetectionThreshold == threshold
+                        //                         ) {
+                        //                             self.pauseDetectionThreshold = threshold
+                        //                         }
+                        //                     }
+                        //                 }
+                        //                 .padding(.vertical, 4)
+                        //             }
+                        //         }
+                        //         .padding(.leading, 12)
+                        //         .onChange(of: pauseDetectionThreshold) { newValue in
+                        //             // Notify the speech recognizer of the change
+                        //             NotificationCenter.default.post(
+                        //                 name: NSNotification.Name("PauseDetectionThresholdChanged"),
+                        //                 object: nil,
+                        //                 userInfo: ["threshold": newValue]
+                        //             )
+                        //         }
+                        //     }
+                        // }
                         
                         Divider()
                             .padding(.vertical, 8)

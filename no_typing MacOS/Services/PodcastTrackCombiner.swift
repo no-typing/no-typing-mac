@@ -19,9 +19,10 @@ class PodcastTrackCombiner {
         }
     }
     
-    /// Combines multiple audio files (one per host/speaker) into a single stereo/mono mix.
-    /// Each input track is assumed to be a separate host recording from the same session.
-    /// The combined output is a 16kHz mono WAV suitable for Whisper transcription.
+    /// Combines multiple audio files (one per host/speaker) into a single mono mix
+    /// by concatenating them sequentially on the timeline.
+    /// Each input track is placed one after the other so the full length of every host's
+    /// audio is included. The combined output is an m4a suitable for Whisper transcription.
     func combineTracksToMono(trackURLs: [URL], completion: @escaping (Result<URL, Error>) -> Void) {
         guard !trackURLs.isEmpty else {
             completion(.failure(CombineError.noTracks))
@@ -37,7 +38,13 @@ class PodcastTrackCombiner {
         let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("podcast_combined_\(UUID().uuidString).m4a")
         
         let composition = AVMutableComposition()
+        guard let compositionTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            completion(.failure(CombineError.exportFailed("Could not create composition track.")))
+            return
+        }
         
+        // Insert each track sequentially — advance cursor by each track's duration
+        var cursor = CMTime.zero
         for (index, trackURL) in trackURLs.enumerated() {
             let asset = AVURLAsset(url: trackURL)
             guard let audioTrack = asset.tracks(withMediaType: .audio).first else {
@@ -45,15 +52,12 @@ class PodcastTrackCombiner {
                 return
             }
             
-            guard let compositionTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-                completion(.failure(CombineError.trackReadFailed("Failed to create composition track for \(trackURL.lastPathComponent)")))
-                return
-            }
+            let duration = asset.duration
+            let timeRange = CMTimeRange(start: .zero, duration: duration)
             
             do {
-                let duration = asset.duration
-                let timeRange = CMTimeRange(start: .zero, duration: duration)
-                try compositionTrack.insertTimeRange(timeRange, of: audioTrack, at: .zero)
+                try compositionTrack.insertTimeRange(timeRange, of: audioTrack, at: cursor)
+                cursor = CMTimeAdd(cursor, duration)
             } catch {
                 completion(.failure(CombineError.trackReadFailed("Insert failed for track \(index + 1): \(error.localizedDescription)")))
                 return
@@ -83,17 +87,8 @@ class PodcastTrackCombiner {
         }
     }
     
-    /// Combines tracks and then feeds the result into FileTranscriptionManager
-    func combineAndTranscribe(trackURLs: [URL]) {
-        combineTracksToMono(trackURLs: trackURLs) { result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let combinedURL):
-                    FileTranscriptionManager.shared.transcribeFile(url: combinedURL)
-                case .failure(let error):
-                    FileTranscriptionManager.shared.errorMessage = "Podcast combine failed: \(error.localizedDescription)"
-                }
-            }
-        }
+    /// Transcribes each track individually and produces a [Speaker Name] labeled output.
+    func combineAndTranscribe(trackURLs: [URL], speakerNames: [String] = []) {
+        FileTranscriptionManager.shared.transcribePodcastTracks(trackURLs, speakerNames: speakerNames)
     }
 }

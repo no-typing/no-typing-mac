@@ -102,10 +102,158 @@ struct CopyPastingTextField: NSViewRepresentable {
     }
 }
 
+// MARK: - Drop Delegate for Reordering
+struct PodcastDropDelegate: DropDelegate {
+    let itemIndex: Int
+    @Binding var tracks: [URL]
+    @Binding var speakers: [String]
+    @Binding var draggingIndex: Int?
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingIndex = nil
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let sourceIndex = draggingIndex else { return }
+        guard sourceIndex != itemIndex else { return }
+        
+        withAnimation {
+            let movedTrack = tracks.remove(at: sourceIndex)
+            tracks.insert(movedTrack, at: itemIndex)
+            
+            if sourceIndex < speakers.count && itemIndex <= speakers.count {
+                let movedSpeaker = speakers.remove(at: sourceIndex)
+                speakers.insert(movedSpeaker, at: itemIndex)
+            }
+            draggingIndex = itemIndex
+        }
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+}
+
+// MARK: - Podcast Track Row
+private struct PodcastTrackRow: View {
+    let index: Int
+    let url: URL
+    @Binding var speakerNames: [String]
+    let onRemove: () -> Void
+    let onAddSpeaker: (Int) -> Void
+    let onMoveUp: (() -> Void)?
+    let onMoveDown: (() -> Void)?
+    @ObservedObject private var speakerManager = SpeakerManager.shared
+    
+    private var currentName: String {
+        index < speakerNames.count ? speakerNames[index] : "Unknown"
+    }
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "person.circle.fill")
+                .foregroundColor(.cyan)
+                .font(.system(size: 16))
+            
+            Menu {
+                ForEach(speakerManager.speakers, id: \.self) { speaker in
+                    Button(action: {
+                        if index < speakerNames.count {
+                            speakerNames[index] = speaker
+                        }
+                    }) {
+                        HStack {
+                            if speaker == currentName {
+                                Image(systemName: "checkmark")
+                            }
+                            Text(speaker)
+                        }
+                    }
+                }
+                
+                if !speakerManager.speakers.isEmpty { Divider() }
+                
+                if !speakerManager.speakers.isEmpty {
+                    Menu("Remove Speaker…") {
+                        ForEach(speakerManager.speakers, id: \.self) { speaker in
+                            Button(role: .destructive, action: {
+                                speakerManager.remove(speaker)
+                                for i in speakerNames.indices where speakerNames[i] == speaker {
+                                    speakerNames[i] = "Unknown"
+                                }
+                            }) {
+                                Text(speaker)
+                            }
+                        }
+                    }
+                    Divider()
+                }
+                
+                Button(action: { onAddSpeaker(index) }) {
+                    Label("Add New Speaker…", systemImage: "plus.circle")
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(currentName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(6)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            
+            Text(url.lastPathComponent)
+                .font(.caption)
+                .foregroundColor(ThemeColors.secondaryText)
+                .lineLimit(1)
+            Spacer()
+            
+            // Reorder controls
+            if onMoveUp != nil || onMoveDown != nil {
+                VStack(spacing: 6) {
+                    Button(action: { onMoveUp?() }) {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(onMoveUp != nil ? .white.opacity(0.8) : .white.opacity(0.25))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(onMoveUp == nil)
+                    
+                    Button(action: { onMoveDown?() }) {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(onMoveDown != nil ? .white.opacity(0.8) : .white.opacity(0.25))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(onMoveDown == nil)
+                }
+                .padding(.horizontal, 4)
+            }
+            
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.red.opacity(0.7))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(8)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(6)
+    }
+}
+
 struct TranscribeFileView: View {
     @StateObject private var manager = FileTranscriptionManager.shared
     @StateObject private var ytdlpManager = YTDLPManager.shared
     @StateObject private var webhookManager = WebhookManager.shared
+    @StateObject private var whisperManager = WhisperManager.shared
+    @ObservedObject private var speakerManager = SpeakerManager.shared
     @State private var fileWebhookEndpointId: String = UserDefaults.standard.string(forKey: "fileTranscriptionWebhookEndpointId") ?? ""
     
     @State private var isHoveringUpload = false
@@ -118,6 +266,9 @@ struct TranscribeFileView: View {
     @State private var isFetchingMetadata: Bool = false
     @State private var urlErrorMessage: String? = nil
     @State private var podcastTracks: [URL] = []
+    @State private var podcastSpeakerNames: [String] = []
+    @State private var showAdvancedOptions: Bool = false
+    @State private var draggingPodcastIndex: Int? = nil
     
     var body: some View {
 // ... existing UI ...
@@ -207,7 +358,50 @@ struct TranscribeFileView: View {
                     .font(.system(size: 13))
             }
             
-            // Translate Settings
+            advancedOptionsCard
+
+            // Output Box
+            if !manager.transcribedText.isEmpty {
+                outputBox
+            } else {
+                Spacer()
+            }
+        }
+    }
+    
+    // MARK: - Advanced Options Card
+    
+    private var advancedOptionsCard: some View {
+        VStack(spacing: 0) {
+            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showAdvancedOptions.toggle() } }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 13))
+                    Text("Advanced Options")
+                        .font(.system(size: 13, weight: .medium))
+                    Spacer()
+                    Image(systemName: showAdvancedOptions ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundColor(ThemeColors.secondaryText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .background(Color.black.opacity(0.25))
+            }
+            .buttonStyle(.plain)
+            
+            if showAdvancedOptions {
+                advancedOptionsContent
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.07)))
+        .padding(.bottom, 8)
+    }
+    
+    private var advancedOptionsContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $manager.translateToEnglish) {
                 HStack(spacing: 6) {
                     Image(systemName: "globe")
@@ -217,7 +411,6 @@ struct TranscribeFileView: View {
                 .foregroundColor(manager.translateToEnglish ? .white : ThemeColors.secondaryText)
             }
             .toggleStyle(.checkbox)
-            .padding(.bottom, 8)
             
             // Transcription Service
             VStack(alignment: .leading, spacing: 8) {
@@ -229,37 +422,15 @@ struct TranscribeFileView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white)
                     Spacer()
-                    Picker("Service", selection: Binding(
-                        get: {
-                            manager.useCloudEngine ? manager.cloudProvider.rawValue : "local"
-                        },
-                        set: { newValue in
-                            if newValue == "local" {
-                                manager.useCloudEngine = false
-                            } else {
-                                manager.useCloudEngine = true
-                                if let provider = CloudTranscriptionProvider.allCases.first(where: { $0.rawValue == newValue }) {
-                                    manager.cloudProvider = provider
-                                }
-                            }
-                        }
-                    )) {
-                        Text("Local (Whisper.cpp)").tag("local")
-                        Divider()
-                        ForEach(CloudTranscriptionProvider.allCases) { provider in
-                            Text(provider.rawValue).tag(provider.rawValue)
-                        }
-                    }
-                    .frame(width: 220)
+                    transcriptionServicePicker
                 }
             }
             .padding(12)
-            .background(Color.black.opacity(0.2))
-            .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05)))
-            .padding(.bottom, 8)
+            .background(Color.black.opacity(0.3))
+            .cornerRadius(8)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.05)))
             
-            // Webhook Endpoint Selection
+            // Webhook
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: "antenna.radiowaves.left.and.right")
@@ -269,37 +440,70 @@ struct TranscribeFileView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white)
                     Spacer()
-                    Picker("Webhook", selection: Binding(
-                        get: { fileWebhookEndpointId },
-                        set: { newValue in
-                            fileWebhookEndpointId = newValue
-                            UserDefaults.standard.set(newValue, forKey: "fileTranscriptionWebhookEndpointId")
-                        }
-                    )) {
-                        Text("None").tag("")
-                        ForEach(webhookManager.endpoints) { endpoint in
-                            Text(endpoint.name).tag(endpoint.id.uuidString)
-                        }
-                    }
-                    .frame(width: 220)
+                    webhookPicker
                 }
                 Text("Only manually transcribed media is sent to this endpoint. Voice webhook can be found under App Settings.")
                     .font(.system(size: 11))
                     .foregroundColor(ThemeColors.secondaryText)
             }
             .padding(12)
-            .background(Color.black.opacity(0.2))
-            .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05)))
-            .padding(.bottom, 8)
-            
-            // Output Box
-            if !manager.transcribedText.isEmpty {
-                outputBox
+            .background(Color.black.opacity(0.3))
+            .cornerRadius(8)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.05)))
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.black.opacity(0.35))
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+    
+    private var transcriptionServicePicker: some View {
+        Picker("Service", selection: Binding<String>(
+            get: {
+                manager.useCloudEngine ? manager.cloudProvider.rawValue : manager.selectedLocalModel
+            },
+            set: { newValue in
+                if let provider = CloudTranscriptionProvider.allCases.first(where: { $0.rawValue == newValue }) {
+                    manager.useCloudEngine = true
+                    manager.cloudProvider = provider
+                } else {
+                    manager.useCloudEngine = false
+                    manager.selectedLocalModel = newValue
+                }
+            }
+        )) {
+            let availableLocals = whisperManager.availableModels.filter { $0.isAvailable }
+            if availableLocals.isEmpty {
+                Text("Local (Not Downloaded)").tag("local_none")
             } else {
-                Spacer()
+                ForEach(availableLocals) { model in
+                    Text("\(model.displayInfo.displayName) (Local)").tag(model.id)
+                }
+            }
+            
+            Divider()
+            
+            ForEach(CloudTranscriptionProvider.allCases) { provider in
+                Text(provider.rawValue).tag(provider.rawValue)
             }
         }
+        .frame(width: 220)
+    }
+    
+    private var webhookPicker: some View {
+        Picker("Webhook", selection: Binding(
+            get: { fileWebhookEndpointId },
+            set: { newValue in
+                fileWebhookEndpointId = newValue
+                UserDefaults.standard.set(newValue, forKey: "fileTranscriptionWebhookEndpointId")
+            }
+        )) {
+            Text("None").tag("")
+            ForEach(webhookManager.endpoints) { endpoint in
+                Text(endpoint.name).tag(endpoint.id.uuidString)
+            }
+        }
+        .frame(width: 220)
     }
     
     // MARK: - Podcast View
@@ -328,33 +532,37 @@ struct TranscribeFileView: View {
             
             // Track List
             ForEach(Array(podcastTracks.enumerated()), id: \.offset) { index, url in
-                HStack {
-                    Image(systemName: "person.circle.fill")
-                        .foregroundColor(.cyan)
-                    Text("Host \(index + 1): ")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.white)
-                    Text(url.lastPathComponent)
-                        .font(.caption)
-                        .foregroundColor(ThemeColors.secondaryText)
-                        .lineLimit(1)
-                    Spacer()
-                    Button(action: { podcastTracks.remove(at: index) }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.red.opacity(0.7))
-                    }
-                    .buttonStyle(.plain)
+                PodcastTrackRow(
+                    index: index,
+                    url: url,
+                    speakerNames: $podcastSpeakerNames,
+                    onRemove: {
+                        podcastTracks.remove(at: index)
+                        if index < podcastSpeakerNames.count {
+                            podcastSpeakerNames.remove(at: index)
+                        }
+                    },
+                    onAddSpeaker: { idx in promptAddSpeaker(forTrackIndex: idx) },
+                    onMoveUp: index > 0 ? { swapPodcastTrack(from: index, to: index - 1) } : nil,
+                    onMoveDown: index < podcastTracks.count - 1 ? { swapPodcastTrack(from: index, to: index + 1) } : nil
+                )
+                .onDrag {
+                    self.draggingPodcastIndex = index
+                    return NSItemProvider(object: url.absoluteString as NSString)
                 }
-                .padding(8)
-                .background(Color.white.opacity(0.05))
-                .cornerRadius(6)
+                .onDrop(of: [.url, .text], delegate: PodcastDropDelegate(
+                    itemIndex: index,
+                    tracks: $podcastTracks,
+                    speakers: $podcastSpeakerNames,
+                    draggingIndex: $draggingPodcastIndex
+                ))
             }
             
             HStack(spacing: 12) {
                 Button(action: selectPodcastTrack) {
                     HStack(spacing: 6) {
                         Image(systemName: "plus.circle.fill")
-                        Text("Add Host Track")
+                        Text("Add Host Tracks")
                     }
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white)
@@ -367,7 +575,7 @@ struct TranscribeFileView: View {
                 
                 if podcastTracks.count >= 2 {
                     Button(action: {
-                        PodcastTrackCombiner.shared.combineAndTranscribe(trackURLs: podcastTracks)
+                        PodcastTrackCombiner.shared.combineAndTranscribe(trackURLs: podcastTracks, speakerNames: podcastSpeakerNames)
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: "waveform.path")
@@ -384,6 +592,36 @@ struct TranscribeFileView: View {
                     .disabled(manager.isTranscribing)
                 }
             }
+            
+            // Preloader + Cancel row — shown while transcribing
+            if manager.isTranscribing {
+                HStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.75)
+                            .frame(width: 18, height: 18)
+                        Text("\(manager.currentPhase.isEmpty ? "Transcribing" : manager.currentPhase)... \(timeString(from: manager.elapsedTime))")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.white.opacity(0.2))
+                    .cornerRadius(8)
+                    
+                    Button(action: {
+                        manager.cancelTranscription()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(Color.red.opacity(0.8))
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 44, height: 44)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -392,16 +630,53 @@ struct TranscribeFileView: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.2), lineWidth: 1))
     }
     
+    private func swapPodcastTrack(from source: Int, to destination: Int) {
+        withAnimation {
+            podcastTracks.swapAt(source, destination)
+            if source < podcastSpeakerNames.count && destination < podcastSpeakerNames.count {
+                podcastSpeakerNames.swapAt(source, destination)
+            }
+        }
+    }
+    
     private func selectPodcastTrack() {
         let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.allowedFileTypes = ["mp3", "wav", "m4a", "ogg", "opus", "flac", "aac"]
-        panel.title = "Select Host Audio Track"
-        panel.message = "Choose the audio recording for a single podcast host."
+        panel.title = "Select Host Audio Tracks"
+        panel.message = "Choose the audio recordings for the podcast hosts."
         
-        if panel.runModal() == .OK, let url = panel.url {
-            podcastTracks.append(url)
+        if panel.runModal() == .OK {
+            for url in panel.urls {
+                podcastTracks.append(url)
+                podcastSpeakerNames.append("Unknown")
+            }
+        }
+    }
+    
+    private func promptAddSpeaker(forTrackIndex trackIndex: Int) {
+        let alert = NSAlert()
+        alert.messageText = "Add Speaker"
+        alert.informativeText = "Enter a name for this speaker. They will be saved to your speaker list."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Add")
+        alert.addButton(withTitle: "Cancel")
+        
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        input.placeholderString = "Speaker name..."
+        input.bezelStyle = .roundedBezel
+        alert.accessoryView = input
+        
+        alert.window.initialFirstResponder = input
+        
+        if alert.runModal() == .alertFirstButtonReturn {
+            let name = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return }
+            speakerManager.add(name)
+            if trackIndex < podcastSpeakerNames.count {
+                podcastSpeakerNames[trackIndex] = name
+            }
         }
     }
     
@@ -698,6 +973,12 @@ struct TranscribeFileView: View {
                         .foregroundColor(ThemeColors.secondaryText)
                 }
                 
+                if manager.lastTranscriptionDuration > 0 {
+                    Text("• \(timeString(from: manager.lastTranscriptionDuration))")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(ThemeColors.secondaryText)
+                }
+                
                 Spacer()
                 
                 // Action Buttons
@@ -748,13 +1029,18 @@ struct TranscribeFileView: View {
                     .padding(16)
                     .textSelection(.enabled)
             }
-            .background(Color.black.opacity(0.3))
+            .background(.blue.opacity(0.1))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
             )
             .frame(minHeight: 200, maxHeight: 400)
+        }
+        .onChange(of: manager.isTranscribing) { isTranscribing in
+            if !isTranscribing {
+                withAnimation { showAdvancedOptions = false }
+            }
         }
     }
     
@@ -812,6 +1098,11 @@ struct TranscribeFileView: View {
     private func startURLTranscription() {
         guard let md = metadata else { return }
         let link = urlInput
+
+        // collapse the advanced options
+        withAnimation {
+            showAdvancedOptions = false
+        }
         
         manager.isTranscribing = true
         manager.errorMessage = nil

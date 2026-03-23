@@ -151,72 +151,91 @@ class TranscriptionCleaner {
         """
         
         do {
-            let openAIAvailable = OpenAIManager.shared.hasValidKey
-            let anthropicAvailable = AnthropicManager.shared.hasValidKey
-            let openaiModel = UserDefaults.standard.string(forKey: "openaiModelSelection") ?? OpenAIModel.gpt4o.rawValue
-            let anthropicModel = UserDefaults.standard.string(forKey: "anthropicModelSelection") ?? AnthropicModel.claude35Sonnet.rawValue
+            let rewriteProviderString = UserDefaults.standard.string(forKey: "aiRewriteProvider") ?? "Apple Intelligence"
             
-            // Extended LLMs
-            let extendedProviderRaw = UserDefaults.standard.string(forKey: "extendedLLMProvider") ?? LLMProvider.groq.rawValue
-            let extendedProvider = LLMProvider(rawValue: extendedProviderRaw) ?? .custom
-            let extendedGroqKey = UserDefaults.standard.string(forKey: "groqApiKey") ?? ""
-            let extendedDeepseekKey = UserDefaults.standard.string(forKey: "deepseekApiKey") ?? ""
-            let extendedOllamaURL = UserDefaults.standard.string(forKey: "ollamaBaseURL") ?? "http://localhost:11434/v1/chat/completions"
-            let extendedCustomURL = UserDefaults.standard.string(forKey: "customLLMBaseURL") ?? "https://api.openai.com/v1/chat/completions"
-            let extendedCustomKey = UserDefaults.standard.string(forKey: "customLLMApiKey") ?? ""
+            // Models
+            let openaiModel = UserDefaults.standard.string(forKey: "openaiModelSelection") ?? "gpt-4o"
+            let anthropicModel = UserDefaults.standard.string(forKey: "anthropicModelSelection") ?? "claude-3-5-sonnet-latest"
             
-            var extendedKey = ""
-            var extendedURL = ""
-            var extendedModel = ""
-            var extendedIsConfigured = false
+            let groqModel = UserDefaults.standard.string(forKey: "groqModel") ?? "llama3-70b-8192"
+            let deepseekModel = UserDefaults.standard.string(forKey: "deepseekModel") ?? "deepseek-chat"
+            let ollamaModel = UserDefaults.standard.string(forKey: "ollamaModel") ?? "llama3"
+            let customModel = UserDefaults.standard.string(forKey: "customLLMModel") ?? "gpt-4"
             
-            switch extendedProvider {
-            case .groq:
-                extendedKey = extendedGroqKey
-                extendedURL = "https://api.groq.com/openai/v1/chat/completions"
-                extendedModel = UserDefaults.standard.string(forKey: "groqModel") ?? "llama3-70b-8192"
-                extendedIsConfigured = !extendedKey.isEmpty
-            case .deepseek:
-                extendedKey = extendedDeepseekKey
-                extendedURL = "https://api.deepseek.com/chat/completions"
-                extendedModel = UserDefaults.standard.string(forKey: "deepseekModel") ?? "deepseek-chat"
-                extendedIsConfigured = !extendedKey.isEmpty
-            case .ollama:
-                extendedKey = ""
-                extendedURL = extendedOllamaURL
-                extendedModel = UserDefaults.standard.string(forKey: "ollamaModel") ?? "llama3"
-                extendedIsConfigured = !extendedURL.isEmpty
-            case .custom:
-                extendedKey = extendedCustomKey
-                extendedURL = extendedCustomURL
-                extendedModel = UserDefaults.standard.string(forKey: "customLLMModel") ?? "gpt-4"
-                extendedIsConfigured = !extendedURL.isEmpty
-            }
+            // Keys
+            let openAIApiKey = UserDefaults.standard.string(forKey: "openaiApiKey") ?? ""
+            let anthropicApiKey = UserDefaults.standard.string(forKey: "anthropicApiKey") ?? ""
+            let groqApiKey = UserDefaults.standard.string(forKey: "groqApiKey") ?? ""
+            let deepseekApiKey = UserDefaults.standard.string(forKey: "deepseekApiKey") ?? ""
+            let ollamaBaseURL = UserDefaults.standard.string(forKey: "ollamaBaseURL") ?? "http://localhost:11434/v1/chat/completions"
+            let customBaseURL = UserDefaults.standard.string(forKey: "customLLMBaseURL") ?? "https://api.openai.com/v1/chat/completions"
+            let customApiKey = UserDefaults.standard.string(forKey: "customLLMApiKey") ?? ""
             
-            if openAIAvailable {
-                let response = try await OpenAIManager.shared.improveText(prompt: prompt, text: rawText, model: openaiModel)
-                let cleanedText = response.trimmingCharacters(in: .whitespacesAndNewlines)
-                return cleanedText.isEmpty ? trimmedText : cleanedText
-            } else if anthropicAvailable {
-                let response = try await AnthropicManager.shared.improveText(prompt: prompt, text: rawText, model: anthropicModel)
-                let cleanedText = response.trimmingCharacters(in: .whitespacesAndNewlines)
-                return cleanedText.isEmpty ? trimmedText : cleanedText
-            } else if extendedIsConfigured {
-                let response = try await ExtendedLLMManager.shared.improveText(prompt: prompt, text: rawText, provider: extendedProvider, apiKey: extendedKey, baseURL: extendedURL, model: extendedModel)
-                let cleanedText = response.trimmingCharacters(in: .whitespacesAndNewlines)
-                return cleanedText.isEmpty ? trimmedText : cleanedText
-            } else {
+            let response: String
+            
+            switch rewriteProviderString {
+            case "OpenAI":
+                if openAIApiKey.isEmpty { return trimmedText }
+                response = try await OpenAIManager.shared.improveText(prompt: prompt, text: rawText, model: openaiModel)
+                
+            case "Anthropic":
+                if anthropicApiKey.isEmpty { return trimmedText }
+                response = try await AnthropicManager.shared.improveText(prompt: prompt, text: rawText, model: anthropicModel)
+                
+            case "Groq", "Deepseek", "Ollama", "Custom API endpoint":
+                let extProvider: LLMProvider
+                let key: String
+                let url: String
+                let modelUsed: String
+                
+                switch rewriteProviderString {
+                case "Groq":
+                    extProvider = .groq
+                    key = groqApiKey
+                    url = "https://api.groq.com/openai/v1/chat/completions"
+                    modelUsed = groqModel
+                case "Deepseek":
+                    extProvider = .deepseek
+                    key = deepseekApiKey
+                    url = "https://api.deepseek.com/chat/completions"
+                    modelUsed = deepseekModel
+                case "Ollama":
+                    extProvider = .ollama
+                    key = ""
+                    url = ollamaBaseURL
+                    modelUsed = ollamaModel
+                default: 
+                    extProvider = .custom
+                    key = customApiKey
+                    url = customBaseURL
+                    modelUsed = customModel
+                }
+                
+                if (extProvider == .groq || extProvider == .deepseek) && key.isEmpty {
+                    return trimmedText
+                }
+                
+                response = try await ExtendedLLMManager.shared.improveText(prompt: prompt, text: rawText, provider: extProvider, apiKey: key, baseURL: url, model: modelUsed)
+                
+            case "Google":
+                let googleApiKey = UserDefaults.standard.string(forKey: "googleApiKey") ?? ""
+                let googleModel = UserDefaults.standard.string(forKey: "googleModel") ?? "gemini-2.0-flash"
+                if googleApiKey.isEmpty { return trimmedText }
+                let url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+                response = try await ExtendedLLMManager.shared.improveText(prompt: prompt, text: rawText, provider: .google, apiKey: googleApiKey, baseURL: url, model: googleModel)
+                
+            default: // Apple Intelligence
                 if #available(macOS 26.0, *) {
                     let session = LanguageModelSession()
-                    let response = try await session.respond(to: prompt)
-                    let cleanedText = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
-                    
-                    // Ensure we don't return empty text
-                    return cleanedText.isEmpty ? trimmedText : cleanedText
+                    let result = try await session.respond(to: prompt)
+                    response = result.content
                 } else {
                     return trimmedText
                 }
             }
+            
+            let cleanedText = response.trimmingCharacters(in: .whitespacesAndNewlines)
+            return cleanedText.isEmpty ? trimmedText : cleanedText
         } catch {
             print("⚠️ TranscriptionCleaner: Failed to clean text - \(error.localizedDescription)")
             // Return original text if cleaning fails
@@ -228,13 +247,17 @@ class TranscriptionCleaner {
         #endif
     }
     
-    /// Check if Foundation Models is available
+    /// Check if the cleaning service should be considered available
     func isAvailable() -> Bool {
+        let providerString = UserDefaults.standard.string(forKey: "aiRewriteProvider") ?? "Apple Intelligence"
+        
+        // If using a cloud provider, it's always "available" (provided there's an API key)
+        if providerString != "Apple Intelligence" {
+            return true
+        }
+        
         #if canImport(FoundationModels)
-        // FoundationModels framework requires macOS 15.1 or later
         if #available(macOS 15.1, *) {
-            // Additional runtime check could be added here to verify
-            // Apple Intelligence is available on the device
             return true
         }
         #endif

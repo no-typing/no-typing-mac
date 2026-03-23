@@ -145,37 +145,18 @@ struct SettingsToggleRow: View {
 
     var body: some View {
         HStack {
-            if let gradient = iconGradient {
-                ZStack {
-                    Circle()
-                        .fill(gradient)
-                        .frame(width: 32, height: 32)
-                    Image(systemName: icon)
-                        .foregroundColor(.white)
-                }
-            } else {
-                Image(systemName: icon)
-                    .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Color.black.opacity(0.3))
-                    .clipShape(Circle())
-            }
-
-            
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(.blue)
             Text(title)
-                .font(.title3)
+                .font(.body)
                 .foregroundColor(.white)
-            
             Spacer()
-            
             Toggle("", isOn: $isOn)
                 .toggleStyle(SwitchToggleStyle(tint: .white))
                 .labelsHidden()
         }
         .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(Color.black.opacity(0.2))
-        .cornerRadius(12)
     }
 }
 

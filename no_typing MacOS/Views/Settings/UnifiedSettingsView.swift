@@ -122,7 +122,7 @@ struct UnifiedSettingsView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "mic.fill")
                             .foregroundColor(audioManager.isRecordingEnabled ? .green : .red)
-                        Text("Recorder")
+                        Text("Dictation")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white)
                         Toggle("", isOn: $audioManager.isRecordingEnabled)
@@ -130,49 +130,53 @@ struct UnifiedSettingsView: View {
                             .labelsHidden()
                             .scaleEffect(0.8)
                     }
-                    .padding(.trailing, 16)
+                    .padding(.trailing, 0)
                     .help("Enable or disable global recording hotkeys")
 
-                    Button(action: {
-                        if let url = URL(string: "https://no-typing.com/buy-pro") {
-                            NSWorkspace.shared.open(url)
+                    Menu {
+                        ForEach(whisperManager.availableModels) { model in
+                            Button(action: {
+                                if model.isAvailable {
+                                    whisperManager.selectedModelSize = model.id
+                                } else {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        selectedSection = .modelSettings
+                                    }
+                                    whisperManager.downloadModel(modelSize: model.id)
+                                }
+                            }) {
+                                HStack {
+                                    Text(model.displayInfo.displayName)
+                                    if !model.isAvailable {
+                                        Image(systemName: "icloud.and.arrow.down")
+                                    } else if whisperManager.selectedModelSize == model.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
                         }
-                    }) {
+                    } label: {
                         HStack(spacing: 6) {
-                            Text("⭐")
-                                .font(.system(size: 16))
-                            Text("Upgrade to Pro")
-                                .font(.system(size: 13, weight: .medium))
+                            if let current = whisperManager.availableModels.first(where: { $0.id == whisperManager.selectedModelSize }) {
+                                Text(current.displayInfo.displayName)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white)
+                            } else {
+                                Text("Select Model")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.white)
+                            }
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.4, green: 0.6, blue: 1.0),  // Soft blue
-                                    Color(red: 0.8, green: 0.4, blue: 0.9),  // Purple-pink
-                                    Color(red: 1.0, green: 0.4, blue: 0.6)   // Pink-red
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .foregroundColor(.white)
-                        .cornerRadius(20)
-                        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(8)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .onHover { hovering in
-                        if hovering {
-                            NSCursor.pointingHand.push()
-                        } else {
-                            NSCursor.pop()
-                        }
-                    }
+                    .frame(width: 200)
                 }
                 .padding(.horizontal, 32)
                 .padding(.vertical, 24)
@@ -353,21 +357,7 @@ struct UnifiedSettingsView: View {
             )
             .settingsCardStyle()
             
-            DeepLSettingsView()
-                .settingsCardStyle()
-                
-            OpenAISettingsView()
-                .settingsCardStyle()
-                
-            AnthropicSettingsView()
-                .settingsCardStyle()
-                
-            ExtendedLLMSettingsView()
-                .settingsCardStyle()
-                
-            CloudTranscriptionSettingsView()
-                .settingsCardStyle()
-        }
+    }
     }
     
     // MARK: - Hotkeys Section

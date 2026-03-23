@@ -52,41 +52,50 @@ class TranscriptionResultHandler {
     private func cleanAndInsertText(_ text: String, isTemporary: Bool, duration: TimeInterval? = nil) async {
         // Check if cleaning is enabled in settings
         let cleaningEnabled = UserDefaults.standard.bool(forKey: "enableTranscriptionCleaning")
+        let translationEnabled = UserDefaults.standard.bool(forKey: "enableAITranslation")
         
         if cleaningEnabled && TranscriptionCleaner.shared.isAvailable() && !text.isEmpty {
             do {
                 print("🧹 TranscriptionResultHandler: Cleaning streaming text...")
-                print("📝 Original text: \"\(text)\"")
                 let cleanedText = try await TranscriptionCleaner.shared.cleanTranscription(text)
-                print("✨ Cleaned text: \"\(cleanedText)\"")
-                print("✅ TranscriptionResultHandler: Text cleaned successfully")
+                
+                // Now translate if needed
+                var finalResult = cleanedText
+                if translationEnabled {
+                    print("🌐 TranscriptionResultHandler: Translating cleaned streaming text...")
+                    if let translated = try? await TranscriptionTranslator.shared.translate(text: cleanedText) {
+                        finalResult = translated
+                    }
+                }
                 
                 await MainActor.run {
-                    // Apply text replacements after AI cleaning but before insertion
-                    let processedText = TextReplacementService.shared.applyReplacements(to: cleanedText)
+                    let processedText = TextReplacementService.shared.applyReplacements(to: finalResult)
                     self.handleTranscriptionInsertion(processedText, isTemporary: isTemporary, duration: duration)
                 }
             } catch {
-                print("⚠️ TranscriptionResultHandler: Cleaning failed, using original text")
+                print("⚠️ TranscriptionResultHandler: Cleaning failed, fallback to original text (+ translation if enabled)")
+                var finalResult = text
+                if translationEnabled {
+                    if let translated = try? await TranscriptionTranslator.shared.translate(text: text) {
+                        finalResult = translated
+                    }
+                }
                 await MainActor.run {
-                    // Apply text replacements even when cleaning fails
-                    let processedText = TextReplacementService.shared.applyReplacements(to: text)
+                    let processedText = TextReplacementService.shared.applyReplacements(to: finalResult)
                     self.handleTranscriptionInsertion(processedText, isTemporary: isTemporary, duration: duration)
                 }
             }
         } else {
-            // If cleaning is disabled or unavailable, use original text
-            await MainActor.run {
-                var processedText = text
-                
-                // Apply auto-punctuation if enabled and this is final text
-                let autoPunctuationEnabled = UserDefaults.standard.bool(forKey: "enableAutoPunctuation")
-                if autoPunctuationEnabled && !isTemporary {
-                    processedText = self.textFormatter.autoPunctuate(processedText)
+            // No cleaning, but maybe translation
+            var finalResult = text
+            if translationEnabled && !text.isEmpty {
+                if let translated = try? await TranscriptionTranslator.shared.translate(text: text) {
+                    finalResult = translated
                 }
-                
-                // Apply text replacements
-                processedText = TextReplacementService.shared.applyReplacements(to: processedText)
+            }
+            
+            await MainActor.run {
+                let processedText = TextReplacementService.shared.applyReplacements(to: finalResult)
                 self.handleTranscriptionInsertion(processedText, isTemporary: isTemporary, duration: duration)
             }
         }
@@ -97,43 +106,51 @@ class TranscriptionResultHandler {
         let textToClean = accumulatedText
         accumulatedText = ""
         
-        // Check if cleaning is enabled in settings
+        if textToClean.isEmpty { return }
+        
         let cleaningEnabled = UserDefaults.standard.bool(forKey: "enableTranscriptionCleaning")
+        let translationEnabled = UserDefaults.standard.bool(forKey: "enableAITranslation")
         
         if cleaningEnabled && TranscriptionCleaner.shared.isAvailable() {
             do {
                 print("🧹 TranscriptionResultHandler: Cleaning accumulated text...")
-                print("📝 Original text: \"\(textToClean)\"")
                 let cleanedText = try await TranscriptionCleaner.shared.cleanTranscription(textToClean)
-                print("✨ Cleaned text: \"\(cleanedText)\"")
-                print("✅ TranscriptionResultHandler: Text cleaned successfully")
+                
+                var finalResult = cleanedText
+                if translationEnabled {
+                    print("🌐 TranscriptionResultHandler: Translating cleaned accumulated text...")
+                    if let translated = try? await TranscriptionTranslator.shared.translate(text: cleanedText) {
+                        finalResult = translated
+                    }
+                }
                 
                 await MainActor.run {
-                    // Apply text replacements after AI cleaning but before insertion
-                    let processedText = TextReplacementService.shared.applyReplacements(to: cleanedText)
+                    let processedText = TextReplacementService.shared.applyReplacements(to: finalResult)
                     self.insertAccumulatedText(processedText)
                 }
             } catch {
-                print("⚠️ TranscriptionResultHandler: Cleaning failed, using original text")
+                print("⚠️ TranscriptionResultHandler: Cleaning failed for accumulated text")
+                var finalResult = textToClean
+                if translationEnabled {
+                    if let translated = try? await TranscriptionTranslator.shared.translate(text: textToClean) {
+                        finalResult = translated
+                    }
+                }
                 await MainActor.run {
-                    // Apply text replacements even when cleaning fails
-                    let processedText = TextReplacementService.shared.applyReplacements(to: textToClean)
+                    let processedText = TextReplacementService.shared.applyReplacements(to: finalResult)
                     self.insertAccumulatedText(processedText)
                 }
             }
         } else {
-            // If cleaning is disabled or unavailable, use original text
-            await MainActor.run {
-                var processedText = textToClean
-                
-                // Apply auto-punctuation if enabled
-                let autoPunctuationEnabled = UserDefaults.standard.bool(forKey: "enableAutoPunctuation")
-                if autoPunctuationEnabled {
-                    processedText = self.textFormatter.autoPunctuate(processedText)
+            var finalResult = textToClean
+            if translationEnabled {
+                if let translated = try? await TranscriptionTranslator.shared.translate(text: textToClean) {
+                    finalResult = translated
                 }
-                
-                // Apply text replacements when cleaning is disabled
-                processedText = TextReplacementService.shared.applyReplacements(to: processedText)
+            }
+            
+            await MainActor.run {
+                let processedText = TextReplacementService.shared.applyReplacements(to: finalResult)
                 self.insertAccumulatedText(processedText)
             }
         }

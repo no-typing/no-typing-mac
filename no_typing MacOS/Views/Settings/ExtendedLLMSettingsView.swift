@@ -212,6 +212,10 @@ struct ExtendedLLMSettingsView: View {
             key = ""
             url = ollamaBaseURL
             modelStr = ollamaModel
+        case .google:
+            key = UserDefaults.standard.string(forKey: "googleApiKey") ?? ""
+            url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+            modelStr = UserDefaults.standard.string(forKey: "googleModel") ?? "gemini-2.0-flash"
         case .custom:
             key = customApiKey
             url = customBaseURL

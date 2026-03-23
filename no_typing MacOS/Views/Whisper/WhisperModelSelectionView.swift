@@ -241,15 +241,10 @@ struct WhisperModelSelectionView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         // Model Management Section
                         VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "waveform")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(.blue)
-                                Text("Speech to Text Model")
-                                    .font(.body)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.white)
-                            }
+                            
+                            Text("Local Models")
+                            .font(.title2.weight(.bold))
+                            .foregroundColor(.white)
                             
                             // Model Selection Dropdown (Removed, integrated into Cards)
                             // Show warning if no models are available
@@ -431,6 +426,11 @@ struct WhisperModelSelectionView: View {
                         Divider()
                             .padding(.vertical, 8)
                         
+                
+                        CloudTranscriptionSettingsView()
+
+                        Divider()
+                            .padding(.vertical, 8)
                         // Language Selection
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 8) {
@@ -568,21 +568,13 @@ struct WhisperModelSelectionView: View {
                         
                         Divider()
                         
-                        // AI Rewrite Toggle
+                        // AI Rewrite Settings
                         VStack(alignment: .leading, spacing: 8) {
+                            AIRewriteSettingsView().padding(.bottom, 16)
                             
-                            SettingsToggleRow(
-                                icon: "sparkles",
-                                title: "AI Rewrite",
-                                isOn: $enableTranscriptionCleaning,
-                                iconGradient: LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            )
+                            AITranslationSettingsView()
                             
                             if enableTranscriptionCleaning {
-                                Text("Uses Apple Intelligence to improve grammar and sentence structure")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                
                                 // Tone Selection
                                 HStack(spacing: 8) {
                                     Image(systemName: "text.bubble")
@@ -611,8 +603,13 @@ struct WhisperModelSelectionView: View {
                                             userInfo: ["tone": newValue]
                                         )
                                     }
-                                }
-                                .padding(.top, 8)
+                                }.padding(16)
+                                    .background(Color.white.opacity(0.05))
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                    )
                                 
                                 Text("Choose how AI rewrites your transcriptions")
                                     .font(.caption)

@@ -3,6 +3,7 @@ import Foundation
 enum LLMProvider: String, CaseIterable, Identifiable {
     case groq = "Groq"
     case deepseek = "Deepseek"
+    case google = "Google"
     case ollama = "Ollama"
     case custom = "Custom OpenAI Endpoint"
     

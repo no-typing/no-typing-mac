@@ -43,6 +43,12 @@ class CloudTranscriptionManager {
     var groqApiKey: String { UserDefaults.standard.string(forKey: "cloudGroqApiKey") ?? "" }
     var customURL: String { UserDefaults.standard.string(forKey: "cloudCustomURL") ?? "" }
     var customApiKey: String { UserDefaults.standard.string(forKey: "cloudCustomApiKey") ?? "" }
+    
+    var openAIModel: String { UserDefaults.standard.string(forKey: "cloudOpenAIModel") ?? "whisper-1" }
+    var elevenLabsModel: String { UserDefaults.standard.string(forKey: "cloudElevenLabsModel") ?? "scribe_v1" }
+    var deepgramModel: String { UserDefaults.standard.string(forKey: "cloudDeepgramModel") ?? "nova-2" }
+    var groqModel: String { UserDefaults.standard.string(forKey: "cloudGroqModel") ?? "whisper-large-v3-turbo" }
+    var customModel: String { UserDefaults.standard.string(forKey: "cloudCustomModel") ?? "whisper-1" }
 
     func transcribe(audioURL: URL, provider: CloudTranscriptionProvider, language: String? = nil) async throws -> [WhisperTranscriptionSegment] {
         switch provider {
@@ -59,10 +65,42 @@ class CloudTranscriptionManager {
         }
     }
     
+    // MARK: - Auth Testing
+    func testConnection(for provider: CloudTranscriptionProvider, apiKey: String, customURL: String = "") async throws -> Bool {
+        switch provider {
+        case .openai:
+            guard let url = URL(string: "https://api.openai.com/v1/models") else { return false }
+            var req = URLRequest(url: url)
+            req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            return (resp as? HTTPURLResponse)?.statusCode == 200
+        case .deepgram:
+            guard let url = URL(string: "https://api.deepgram.com/v1/projects") else { return false }
+            var req = URLRequest(url: url)
+            req.setValue("Token \(apiKey)", forHTTPHeaderField: "Authorization")
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            return (resp as? HTTPURLResponse)?.statusCode == 200
+        case .elevenlabs:
+            guard let url = URL(string: "https://api.elevenlabs.io/v1/models") else { return false }
+            var req = URLRequest(url: url)
+            req.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            return (resp as? HTTPURLResponse)?.statusCode == 200
+        case .groq:
+            guard let url = URL(string: "https://api.groq.com/openai/v1/models") else { return false }
+            var req = URLRequest(url: url)
+            req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            return (resp as? HTTPURLResponse)?.statusCode == 200
+        case .custom:
+            return URL(string: customURL) != nil
+        }
+    }
+    
     // MARK: - Deepgram (Diarization supported natively)
     private func transcribeDeepgram(audioURL: URL, language: String?) async throws -> [WhisperTranscriptionSegment] {
         guard !deepgramApiKey.isEmpty else { throw CloudTranscriptionError.invalidAPIKey }
-        var urlStr = "https://api.deepgram.com/v1/listen?smart_format=true&diarize=true&punctuate=true"
+        var urlStr = "https://api.deepgram.com/v1/listen?smart_format=true&diarize=true&punctuate=true&model=\(deepgramModel)"
         if let lang = language, lang != "auto" {
             urlStr += "&language=\(lang)"
         }
@@ -152,7 +190,7 @@ class CloudTranscriptionManager {
         // Model
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"model_id\"\r\n\r\n".data(using: .utf8)!)
-        body.append("scribe_v1\r\n".data(using: .utf8)!)
+        body.append("\(elevenLabsModel)\r\n".data(using: .utf8)!)
         
         // File
         let fileData = try Data(contentsOf: audioURL)
@@ -232,18 +270,18 @@ class CloudTranscriptionManager {
     // MARK: - OpenAI 
     private func transcribeOpenAI(audioURL: URL, language: String?) async throws -> [WhisperTranscriptionSegment] {
         guard !openAIApiKey.isEmpty else { throw CloudTranscriptionError.invalidAPIKey }
-        return try await transcribeWhisperCompatible(audioURL: audioURL, endpoint: "https://api.openai.com/v1/audio/transcriptions", apiKey: openAIApiKey, language: language)
+        return try await transcribeWhisperCompatible(audioURL: audioURL, endpoint: "https://api.openai.com/v1/audio/transcriptions", apiKey: openAIApiKey, model: openAIModel, language: language)
     }
 
     // MARK: - Groq
     private func transcribeGroq(audioURL: URL, language: String?) async throws -> [WhisperTranscriptionSegment] {
         guard !groqApiKey.isEmpty else { throw CloudTranscriptionError.invalidAPIKey }
-        return try await transcribeWhisperCompatible(audioURL: audioURL, endpoint: "https://api.groq.com/openai/v1/audio/transcriptions", apiKey: groqApiKey, model: "whisper-large-v3-turbo", language: language)
+        return try await transcribeWhisperCompatible(audioURL: audioURL, endpoint: "https://api.groq.com/openai/v1/audio/transcriptions", apiKey: groqApiKey, model: groqModel, language: language)
     }
     
     private func transcribeCustom(audioURL: URL, language: String?) async throws -> [WhisperTranscriptionSegment] {
         guard !customURL.isEmpty else { throw CloudTranscriptionError.invalidURL }
-        return try await transcribeWhisperCompatible(audioURL: audioURL, endpoint: customURL, apiKey: customApiKey, model: "whisper-1", language: language)
+        return try await transcribeWhisperCompatible(audioURL: audioURL, endpoint: customURL, apiKey: customApiKey, model: customModel, language: language)
     }
     
     // MARK: - Generic OpenAI-Compatible Whisper Multipart Helper

@@ -55,21 +55,21 @@ struct MagicActionsView: View {
             if selectedTab == 0 {
                 // Enable/Disable Toggle
                 VStack(alignment: .leading, spacing: 16) {
-                SettingsToggleRow(
-                    icon: "text.cursor",
-                    title: "Smart Replacements",
-                    isOn: $replacementService.isEnabled,
-                    iconGradient: LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
-                .onChange(of: replacementService.isEnabled) { enabled in
-                    replacementService.setEnabled(enabled)
+                    SettingsToggleRow(
+                        icon: "text.cursor",
+                        title: "Smart Replacements",
+                        isOn: $replacementService.isEnabled,
+                        iconGradient: LinearGradient(colors: [.indigo, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                    .onChange(of: replacementService.isEnabled) { enabled in
+                        replacementService.setEnabled(enabled)
+                    }
+                    
+                    Text("Automatically substitute specific keywords with your preferred phrases.")
+                        .font(.system(size: 13))
+                        .foregroundColor(ThemeColors.secondaryText)
+                        .padding(.leading, 12)
                 }
-                
-                Text("Automatically substitute specific keywords with your preferred phrases.")
-                    .font(.system(size: 13))
-                    .foregroundColor(ThemeColors.secondaryText)
-                    .padding(.leading, 12)
-            }
             
             if replacementService.isEnabled {
                 // Add button

@@ -150,7 +150,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             displayName: "Whisper v3",
             icon: "star.circle",
             description: "Highest accuracy model for professional transcription and complex audio.",
-            recommendation: "Best for short transcriptions"
+            recommendation: "Best for long transcriptions"
         ),
         "large_v3_turbo": ModelDisplayInfo(
             id: "large_v3_turbo",
@@ -164,14 +164,14 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             displayName: "Distil Whisper",
             icon: "sparkles",
             description: "Fastest large model. Perfect for English language only.",
-            recommendation: "Fastest for English-only transcription"
+            recommendation: "Best for English-only transcription"
         ),
         "parakeet_v2": ModelDisplayInfo(
             id: "parakeet_v2",
             displayName: "Parakeet v2",
             icon: "bird",
             description: "NVIDIA's 0.6B param Fast Conformer TDT model. English-only, up to 300x realtime on Apple Silicon.",
-            recommendation: "Fastest English transcription (M-series recommended)"
+            recommendation: "Good for English transcription (M-series recommended)"
         ),
         "parakeet_v3": ModelDisplayInfo(
             id: "parakeet_v3",

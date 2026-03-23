@@ -25,8 +25,13 @@ class FileTranscriptionManager: ObservableObject {
         didSet { UserDefaults.standard.set(selectedLocalModel, forKey: "fileTranscriptionLocalModel") }
     }
     
-    @Published var useCloudEngine: Bool = false
-    @Published var cloudProvider: CloudTranscriptionProvider = .deepgram
+    @Published var useCloudEngine: Bool = UserDefaults.standard.bool(forKey: "cloudTranscriptionEnabled") {
+        didSet { UserDefaults.standard.set(useCloudEngine, forKey: "cloudTranscriptionEnabled") }
+    }
+    
+    @Published var cloudProvider: CloudTranscriptionProvider = CloudTranscriptionProvider(rawValue: UserDefaults.standard.string(forKey: "cloudTranscriptionProvider") ?? "Deepgram") ?? .deepgram {
+        didSet { UserDefaults.standard.set(cloudProvider.rawValue, forKey: "cloudTranscriptionProvider") }
+    }
     
     private init() {}
     

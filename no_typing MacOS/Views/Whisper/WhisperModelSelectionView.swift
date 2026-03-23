@@ -18,6 +18,8 @@ struct WhisperModelSelectionView: View {
     // Add tone selection state
     @AppStorage("selectedTone") private var selectedTone: String = "professional"
     
+    @AppStorage("cloudTranscriptionEnabled") private var useCloudEngine: Bool = false
+    
     // Transcription Service properties
     
     // Define tone categories
@@ -81,109 +83,6 @@ struct WhisperModelSelectionView: View {
         toneCategories.flatMap { $0.tones }
     }
     
-    // Define supported languages with Whisper's language codes (all 99 supported languages)
-    private let supportedLanguages: [(name: String, code: String)] = [
-        ("Auto", "auto"),
-        ("Afrikaans", "af"),
-        ("Amharic", "am"),
-        ("Arabic", "ar"),
-        ("Armenian", "hy"),
-        ("Assamese", "as"),
-        ("Azerbaijani", "az"),
-        ("Bashkir", "ba"),
-        ("Belarusian", "be"),
-        ("Bengali", "bn"),
-        ("Bosnian", "bs"),
-        ("Breton", "br"),
-        ("Bulgarian", "bg"),
-        ("Burmese", "my"),
-        ("Catalan", "ca"),
-        ("Chinese", "zh"),
-        ("Croatian", "hr"),
-        ("Czech", "cs"),
-        ("Danish", "da"),
-        ("Dutch", "nl"),
-        ("English", "en"),
-        ("Estonian", "et"),
-        ("Faroese", "fo"),
-        ("Finnish", "fi"),
-        ("French", "fr"),
-        ("Galician", "gl"),
-        ("Georgian", "ka"),
-        ("German", "de"),
-        ("Greek", "el"),
-        ("Gujarati", "gu"),
-        ("Haitian Creole", "ht"),
-        ("Hausa", "ha"),
-        ("Hawaiian", "haw"),
-        ("Hebrew", "he"),
-        ("Hindi", "hi"),
-        ("Hungarian", "hu"),
-        ("Icelandic", "is"),
-        ("Indonesian", "id"),
-        ("Italian", "it"),
-        ("Japanese", "ja"),
-        ("Javanese", "jw"),
-        ("Kannada", "kn"),
-        ("Kazakh", "kk"),
-        ("Khmer", "km"),
-        ("Korean", "ko"),
-        ("Lao", "lo"),
-        ("Latin", "la"),
-        ("Latvian", "lv"),
-        ("Lingala", "ln"),
-        ("Lithuanian", "lt"),
-        ("Luxembourgish", "lb"),
-        ("Macedonian", "mk"),
-        ("Malagasy", "mg"),
-        ("Malay", "ms"),
-        ("Malayalam", "ml"),
-        ("Maltese", "mt"),
-        ("Maori", "mi"),
-        ("Marathi", "mr"),
-        ("Mongolian", "mn"),
-        ("Nepali", "ne"),
-        ("Norwegian", "no"),
-        ("Norwegian Nynorsk", "nn"),
-        ("Occitan", "oc"),
-        ("Pashto", "ps"),
-        ("Persian", "fa"),
-        ("Polish", "pl"),
-        ("Portuguese", "pt"),
-        ("Punjabi", "pa"),
-        ("Romanian", "ro"),
-        ("Russian", "ru"),
-        ("Sanskrit", "sa"),
-        ("Serbian", "sr"),
-        ("Shona", "sn"),
-        ("Sindhi", "sd"),
-        ("Sinhala", "si"),
-        ("Slovak", "sk"),
-        ("Slovenian", "sl"),
-        ("Somali", "so"),
-        ("Spanish", "es"),
-        ("Sundanese", "su"),
-        ("Swahili", "sw"),
-        ("Swedish", "sv"),
-        ("Tagalog", "tl"),
-        ("Tajik", "tg"),
-        ("Tamil", "ta"),
-        ("Tatar", "tt"),
-        ("Telugu", "te"),
-        ("Thai", "th"),
-        ("Tibetan", "bo"),
-        ("Turkish", "tr"),
-        ("Turkmen", "tk"),
-        ("Ukrainian", "uk"),
-        ("Urdu", "ur"),
-        ("Uzbek", "uz"),
-        ("Vietnamese", "vi"),
-        ("Welsh", "cy"),
-        ("Yiddish", "yi"),
-        ("Yoruba", "yo"),
-        ("Zulu", "zu")
-    ]
-    
     private func getGradientForModel(_ id: String) -> LinearGradient {
         switch id {
         case "small", "Small":
@@ -242,9 +141,27 @@ struct WhisperModelSelectionView: View {
                         // Model Management Section
                         VStack(alignment: .leading, spacing: 12) {
                             
-                            Text("Local Models")
-                            .font(.title2.weight(.bold))
-                            .foregroundColor(.white)
+                            HStack {
+                                Text("Local Models")
+                                    .font(.title2.weight(.bold))
+                                    .foregroundColor(.white)
+                                
+                                if useCloudEngine {
+                                    Spacer()
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "cloud.fill")
+                                            .font(.system(size: 10))
+                                            .foregroundColor(.yellow)
+                                        Text("Cloud model is in use")
+                                            .font(.caption.weight(.medium))
+                                            .foregroundColor(.yellow)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.blue.opacity(0.1))
+                                    .cornerRadius(6)
+                                }
+                            }
                             
                             // Model Selection Dropdown (Removed, integrated into Cards)
                             // Show warning if no models are available
@@ -404,6 +321,8 @@ struct WhisperModelSelectionView: View {
                                     }
                                 }
                             }
+                            .opacity(useCloudEngine ? 0.5 : 1.0)
+                            .disabled(useCloudEngine)
                             
                             if let errorMessage = whisperManager.errorMessage {
                                 Text(errorMessage)
@@ -442,7 +361,7 @@ struct WhisperModelSelectionView: View {
                                     .foregroundColor(.white)
                                 Spacer()
                                 Picker("Language", selection: $selectedLanguage) {
-                                    ForEach(supportedLanguages, id: \.code) { language in
+                                    ForEach(TranscriptionLanguage.all) { language in
                                         Text(language.name).tag(language.code)
                                     }
                                 }

@@ -10,6 +10,8 @@ struct UnifiedSettingsView: View {
     // Permission states
     @State private var hasPermissionIssues = false
     @State private var hasModelIssues = false
+    @AppStorage("enableHotkeys") private var enableHotkeys = true
+    @AppStorage("selectedLanguage") private var selectedLanguage: String = "auto"
     
     enum SettingsSection: String, CaseIterable {
         case recentActivity = "Activity"
@@ -121,7 +123,7 @@ struct UnifiedSettingsView: View {
                     
                     HStack(spacing: 8) {
                         Image(systemName: "mic.fill")
-                            .foregroundColor(audioManager.isRecordingEnabled ? .green : .red)
+                            .foregroundColor(audioManager.isRecordingEnabled ? .white.opacity(0.6) : .red)
                         Text("Dictation")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white)
@@ -166,6 +168,9 @@ struct UnifiedSettingsView: View {
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundColor(.white)
                             }
+                            Image(systemName: "waveform.circle")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.6))
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -176,7 +181,47 @@ struct UnifiedSettingsView: View {
                                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
                         )
                     }
-                    .frame(width: 200)
+                    .frame(width: 140)
+                    .help("Select transcription model")
+                    
+                    Menu {
+                        ForEach(TranscriptionLanguage.all) { language in
+                            Button(action: {
+                                selectedLanguage = language.code
+                                NotificationCenter.default.post(
+                                    name: NSNotification.Name("SelectedLanguageChanged"),
+                                    object: nil,
+                                    userInfo: ["language": language.code]
+                                )
+                            }) {
+                                HStack {
+                                    Text(language.name)
+                                    if selectedLanguage == language.code {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(TranscriptionLanguage.all.first(where: { $0.code == selectedLanguage })?.name ?? "Auto")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white)
+                            Image(systemName: "globe")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                    .frame(width: 120)
+                    .help("Select recognition language")
                 }
                 .padding(.horizontal, 32)
                 .padding(.vertical, 24)
@@ -257,45 +302,7 @@ struct UnifiedSettingsView: View {
                 .cornerRadius(12)
                 .contentShape(Rectangle())
                 
-                if section == .transcribe {
-                    Text("⭐ PRO")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.4, green: 0.6, blue: 1.0),  // Soft blue
-                                    Color(red: 0.8, green: 0.4, blue: 0.9),  // Purple-pink
-                                    Color(red: 1.0, green: 0.4, blue: 0.6)   // Pink-red
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .cornerRadius(4)
-                        .offset(x: 5, y: -4)
-                } else if section == .magicActions {
-                    Text("⭐ PRO")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.4, green: 0.6, blue: 1.0),  // Soft blue
-                                    Color(red: 0.8, green: 0.4, blue: 0.9),  // Purple-pink
-                                    Color(red: 1.0, green: 0.4, blue: 0.6)   // Pink-red
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .cornerRadius(4)
-                        .offset(x: 5, y: -4)
-                } else if hasWarning {
+                if hasWarning {
                     Circle()
                         .fill(Color.red)
                         .frame(width: 8, height: 8)

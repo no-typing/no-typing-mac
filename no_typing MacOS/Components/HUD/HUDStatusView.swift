@@ -138,20 +138,28 @@ struct HUDStatusView {
                             print("🔄 HUD: Showing setup animation")
                         }
                 } else if audioManager.isRecording {
-                    AudioWaveformView()
-                        .frame(width: 52)  // Fits the ultra-compact HUD
-                        .transition(.opacity)
-                        .onAppear {
-                            print("🎙️ HUD: Showing waveform")
+                    HStack(spacing: 8) {
+                        AudioWaveformView()
+                            .frame(width: 52)
+                        
+
+                        
+                        let text = AudioTranscriptionService.shared.accumulatedText
+                        if !text.isEmpty {
+                            Text(text)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .truncationMode(.head)
+                                .transition(.opacity.combined(with: .move(edge: .trailing)))
                         }
+                    }
+                    .transition(.opacity)
                 } else {
                     // Show setup animation as fallback during initial state
                     SetupAnimationView()
                         .frame(width: 52)
                         .transition(.opacity)
-                        .onAppear {
-                            print("⏳ HUD: Showing setup animation (fallback)")
-                        }
                 }
             }
             .animation(.easeInOut(duration: 0.15), value: isHovering)

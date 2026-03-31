@@ -319,10 +319,9 @@ struct WhisperModelSelectionView: View {
                                     .onHover { hovering in
                                         if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                                     }
-                                }
                             }
-                            .opacity(useCloudEngine ? 0.5 : 1.0)
-                            .disabled(useCloudEngine)
+                        }
+                    }
                             
                             if let errorMessage = whisperManager.errorMessage {
                                 Text(errorMessage)
@@ -332,6 +331,8 @@ struct WhisperModelSelectionView: View {
                                     .textSelection(.enabled)
                             }
                         }
+                .opacity(useCloudEngine ? 0.5 : 1.0)
+                .disabled(useCloudEngine)
                         
                         // Divider()
                         //     .padding(.vertical, 8)
@@ -360,12 +361,8 @@ struct WhisperModelSelectionView: View {
                                     .font(.body)
                                     .foregroundColor(.white)
                                 Spacer()
-                                Picker("Language", selection: $selectedLanguage) {
-                                    ForEach(TranscriptionLanguage.all) { language in
-                                        Text(language.name).tag(language.code)
-                                    }
-                                }
-                                .frame(width: 200)
+                                 SearchableLanguagePicker(selection: $selectedLanguage, languages: TranscriptionLanguage.all)
+                                    .frame(width: 250)
                             }
                             
                             Text("Select the primary language you'll be speaking in")
@@ -542,6 +539,5 @@ struct WhisperModelSelectionView: View {
                     .background(Color.clear)
                 }
             
-        }
     }
 }

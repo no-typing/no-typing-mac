@@ -118,9 +118,8 @@ struct AITranslationSettingsView: View {
                         .font(.body)
                         .foregroundColor(.white)
                     Spacer()
-                    TextField("E.g. EN-US, ES, FR, JA", text: $targetLanguage)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 150)
+                    SearchableLanguagePicker(selection: $targetLanguage, languages: TranscriptionLanguage.all)
+                        .frame(width: 250)
                 }
                 
                 Divider()

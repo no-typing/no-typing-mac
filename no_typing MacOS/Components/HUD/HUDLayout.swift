@@ -5,6 +5,7 @@ struct HUDLayout {
     // MARK: - Window Dimensions
     static let width: CGFloat = 68   // Further reduced for ultra-compact size
     static let expandedWidth: CGFloat = 120  // Width when recording is locked
+    static let transcribingWidth: CGFloat = 400 // Width when transcribing text
     static let height: CGFloat = 32  // Reduced by ~10% from 36px
     static let cornerRadius: CGFloat = 16  // Pill-shaped radius
     

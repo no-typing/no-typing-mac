@@ -463,7 +463,6 @@ class AudioManager: ObservableObject {
             // For streaming mode, stop immediately
             print("📝 Streaming mode: Processing final audio segment")
         }
-        
         completeRecordingStop()
     }
     
@@ -497,9 +496,8 @@ class AudioManager: ObservableObject {
     }
     
     private func handleFinalAudioSegment(finalFileURL: URL?) {
-        
-        // If there's a final file, add it to the processing queue
         if let finalFileURL = finalFileURL {
+            // If there's a final file, add it to the processing queue
             print("📝 Adding final audio segment to processing queue")
             let finalTimestamp = self.speechDetectionService.getLastSpeechTime() ?? Date()
             self.audioProcessingQueueService.addToProcessingQueue(
@@ -660,7 +658,7 @@ class AudioManager: ObservableObject {
                 print("AudioManager: System audio capture started successfully")
                 
                 // Set up audio buffer callback for level monitoring natively
-                systemAudioService.onAudioBuffer = { buffer in
+                systemAudioService.onAudioBuffer = { [weak self] buffer in
                     AudioLevelMonitor.shared.processAudioBuffer(buffer)
                 }
                 
@@ -729,6 +727,11 @@ class AudioManager: ObservableObject {
                 if let engine = self.audioEngineService.audioEngine {
                     self.speechDetectionService.startSpeechDetection(with: engine)
                 }
+                
+                // Set up audio buffer callback for level monitoring
+                self.audioEngineService.onAudioBuffer = { [weak self] buffer in
+                    AudioLevelMonitor.shared.processAudioBuffer(buffer)
+                }
             }
         } else if attempts < 10 { // Max 1 second wait (10 * 100ms)
             // Engine not ready yet, check again in 100ms
@@ -749,6 +752,8 @@ class AudioManager: ObservableObject {
             }
         }
     }
+    
+
     
     private func setupAudioEngine() {
         print("AudioManager: Setting up audio engine - START")

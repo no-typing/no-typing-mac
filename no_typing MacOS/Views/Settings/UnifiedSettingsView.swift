@@ -12,6 +12,7 @@ struct UnifiedSettingsView: View {
     @State private var hasModelIssues = false
     @AppStorage("enableHotkeys") private var enableHotkeys = true
     @AppStorage("selectedLanguage") private var selectedLanguage: String = "auto"
+    @AppStorage("cloudTranscriptionEnabled") private var useCloudEngine: Bool = false
     
     enum SettingsSection: String, CaseIterable {
         case recentActivity = "Activity"
@@ -184,44 +185,9 @@ struct UnifiedSettingsView: View {
                     .frame(width: 140)
                     .help("Select transcription model")
                     
-                    Menu {
-                        ForEach(TranscriptionLanguage.all) { language in
-                            Button(action: {
-                                selectedLanguage = language.code
-                                NotificationCenter.default.post(
-                                    name: NSNotification.Name("SelectedLanguageChanged"),
-                                    object: nil,
-                                    userInfo: ["language": language.code]
-                                )
-                            }) {
-                                HStack {
-                                    Text(language.name)
-                                    if selectedLanguage == language.code {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text(TranscriptionLanguage.all.first(where: { $0.code == selectedLanguage })?.name ?? "Auto")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white)
-                            Image(systemName: "globe")
-                                .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.1))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                        )
-                    }
-                    .frame(width: 120)
-                    .help("Select recognition language")
+                    SearchableLanguagePicker(selection: $selectedLanguage, languages: TranscriptionLanguage.all)
+                        .frame(width: 150)
+                        .help("Select recognition language")
                 }
                 .padding(.horizontal, 32)
                 .padding(.vertical, 24)
@@ -265,6 +231,13 @@ struct UnifiedSettingsView: View {
 
         .onAppear {
             checkForIssues()
+        }
+        .onChange(of: selectedLanguage) { newValue in
+            NotificationCenter.default.post(
+                name: NSNotification.Name("SelectedLanguageChanged"),
+                object: nil,
+                userInfo: ["language": newValue]
+            )
         }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
             checkForIssues()
@@ -353,18 +326,19 @@ struct UnifiedSettingsView: View {
     private var modelSettingsSection: some View {
         LazyVStack(alignment: .leading, spacing: 16) {
             // Section Header
-            Text("Model Settings")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(.white)
-                .padding(.bottom, 8)
+            HStack(alignment: .bottom) {
+                Text("Model Settings")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .padding(.bottom, 8)
             
             WhisperModelSelectionView(
                 showTitle: false,
                 showDescription: true
             )
             .settingsCardStyle()
-            
-    }
+        }
     }
     
     // MARK: - Hotkeys Section

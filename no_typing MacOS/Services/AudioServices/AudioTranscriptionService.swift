@@ -20,12 +20,14 @@ class AudioTranscriptionService: ObservableObject {
     private var selectedLanguage: String = UserDefaults.standard.string(forKey: "selectedLanguage") ?? "english"
     
     private init() {
-        // Force useLocalWhisperModel to always be true
-        self.useLocalWhisperModel = true
-        UserDefaults.standard.set(true, forKey: "useLocalWhisperModel")
+        // Initialize based on current UserDefaults
+        let cloudEnabled = UserDefaults.standard.bool(forKey: "cloudTranscriptionEnabled")
+        self.useLocalWhisperModel = !cloudEnabled
         
-        // Start the setup of WhisperManager
-        WhisperManager.shared.startSetup()
+        // Start the setup of WhisperManager if local is enabled
+        if self.useLocalWhisperModel {
+            WhisperManager.shared.startSetup()
+        }
         
         // Observe changes to the 'useLocalWhisperModel' key in UserDefaults
         NotificationCenter.default.addObserver(
@@ -50,11 +52,13 @@ class AudioTranscriptionService: ObservableObject {
     }
     
     @objc private func handleUserDefaultsChanged(_ notification: Notification) {
-        let newValue = UserDefaults.standard.bool(forKey: "useLocalWhisperModel")
-        if newValue != self.useLocalWhisperModel {
-            self.useLocalWhisperModel = newValue
+        let cloudEnabled = UserDefaults.standard.bool(forKey: "cloudTranscriptionEnabled")
+        let shouldUseLocal = !cloudEnabled
+        
+        if shouldUseLocal != self.useLocalWhisperModel {
+            self.useLocalWhisperModel = shouldUseLocal
             
-            if newValue {
+            if shouldUseLocal {
                 // Start setup of WhisperManager
                 WhisperManager.shared.startSetup()
             } else {

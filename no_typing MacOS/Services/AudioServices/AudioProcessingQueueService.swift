@@ -72,15 +72,7 @@ class AudioProcessingQueueService: ObservableObject {
             if useLocalWhisperModel && self.whisperManager.isReady {
                 self.processWithWhisper(audioURL: audioURL, timestamp: timestamp)
             } else {
-                self.sendAudioToBackend(fileURL: audioURL) {
-                    // Clean up immediately
-                    try? FileManager.default.removeItem(at: audioURL)
-                    
-                    DispatchQueue.main.async {
-                        self.isCurrentlyProcessing = false
-                        self.processNextInQueue()
-                    }
-                }
+                self.processWithCloud(audioURL: audioURL, timestamp: timestamp)
             }
         }
     }
@@ -117,61 +109,52 @@ class AudioProcessingQueueService: ObservableObject {
     }
 
     
-    private func sendAudioToBackend(fileURL: URL, completion: @escaping () -> Void) {
-        let url = URL(string: "http://localhost:8180/stt")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue(AppConfig.API_KEY, forHTTPHeaderField: "X-API-Key")
-
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-
-        var data = Data()
-        data.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
-        data.append("Content-Disposition: form-data; name=\"file\"; filename=\"recording.wav\"\r\n".data(using: .utf8)!)
-        data.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
-
-        do {
-            let audioData = try Data(contentsOf: fileURL)
-            data.append(audioData)
-        } catch {
-            print("Error reading audio file: \(error)")
-            completion()
-            return
-        }
-
-        data.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-
-        URLSession.shared.uploadTask(with: request, from: data) { [weak self] data, response, error in
-            guard let self = self else { 
-                completion()
-                return 
-            }
-            
-            if let error = error {
-                print("Error sending audio: \(error)")
-                completion()
-                return
-            }
-
-            if let data = data, let jsonString = String(data: data, encoding: .utf8) {
-                DispatchQueue.main.async {
-                    let transcription = TranscriptionUtils.extractTranscription(from: jsonString)
-                    print("Transcription received: \(transcription)")
-
-                    let asset = AVURLAsset(url: fileURL)
+    private func processWithCloud(audioURL: URL, timestamp: Date) {
+        let providerString = UserDefaults.standard.string(forKey: "cloudTranscriptionProvider") ?? ""
+        let provider = CloudTranscriptionProvider(rawValue: providerString) ?? .deepgram
+        
+        let selectedLanguage = UserDefaults.standard.string(forKey: "selectedLanguage") ?? "auto"
+        
+        print("☁️ Processing with cloud provider: \(provider.rawValue)")
+        
+        Task {
+            do {
+                let segments = try await CloudTranscriptionManager.shared.transcribe(
+                    audioURL: audioURL, 
+                    provider: provider, 
+                    language: selectedLanguage
+                )
+                
+                // Clean up immediately after getting result
+                try? FileManager.default.removeItem(at: audioURL)
+                
+                await MainActor.run {
+                    // Combine segments into a single transcription string
+                    let transcription = segments.map { $0.text }.joined(separator: " ")
+                    
+                    let asset = AVURLAsset(url: audioURL)
                     let audioDuration = CMTimeGetSeconds(asset.duration)
+                    
                     self.audioTranscriptionService.handleTranscriptionResult(transcription, duration: audioDuration)
+                    
+                    // Mark as done and process next
+                    self.isCurrentlyProcessing = false
+                    self.processNextInQueue()
+                }
+            } catch {
+                print("Cloud Transcription error: \(error)")
+                try? FileManager.default.removeItem(at: audioURL)
+                
+                await MainActor.run {
+                    // Mark as done and process next even on failure
+                    self.isCurrentlyProcessing = false
+                    self.processNextInQueue()
                 }
             }
-
-            DispatchQueue.main.async {
-                completion()
-            }
-        }.resume()
+        }
     }
     
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
-} 
+}

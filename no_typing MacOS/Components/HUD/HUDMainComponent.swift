@@ -45,6 +45,7 @@
 
 import Cocoa
 import SwiftUI
+import Combine
 
 // Add ViewHeightKey preference key definition
 private struct ViewHeightKey: PreferenceKey {
@@ -133,6 +134,20 @@ class HUDMainController: NSWindowController {
             object: nil
         )
         
+        // Observe transcription text changes to resize if needed
+        AudioTranscriptionService.shared.$accumulatedText
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] text in
+                self?.handleTranscriptionChanged(text)
+            }
+            .store(in: &cancellables)
+    }
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    private func handleTranscriptionChanged(_ text: String) {
+        // If we have text, we might want to expand
+        resizeWindow(expanded: isLockedExpanded || !text.isEmpty, hasText: !text.isEmpty)
     }
 
     required init?(coder: NSCoder) {
@@ -216,39 +231,41 @@ class HUDMainController: NSWindowController {
               let isLocked = userInfo["isLocked"] as? Bool else { return }
         
         isLockedExpanded = isLocked
-        resizeWindow(expanded: isLocked)
+        let hasText = !AudioTranscriptionService.shared.accumulatedText.isEmpty
+        resizeWindow(expanded: isLocked || hasText, hasText: hasText)
     }
     
-    private func resizeWindow(expanded: Bool) {
+    private func resizeWindow(expanded: Bool, hasText: Bool = false) {
         guard let window = self.window else { return }
         
-        // Don't animate if already in the desired state
-        if isWindowExpanded == expanded { return }
+        // Calculate the target width
+        var targetWidth: CGFloat = HUDLayout.width
+        if expanded {
+            targetWidth = hasText ? HUDLayout.transcribingWidth : HUDLayout.expandedWidth
+        }
+        
+        // Don't animate if already at the target width
+        if window.frame.width == targetWidth { return }
         
         isWindowExpanded = expanded
         
         if let screen = NSScreen.main {
-            let screenFrame = screen.frame
+            // ... [calculate position]
             let visibleFrame = screen.visibleFrame
+            let screenFrame = screen.frame
             
-            // Calculate dock height
             let dockHeight = visibleFrame.minY - screenFrame.minY
             let paddingAboveDock: CGFloat = 10
             let bottomPadding = dockHeight + paddingAboveDock
             
-            // Calculate the new width
-            let newWidth = expanded ? HUDLayout.expandedWidth : HUDLayout.width
-            
-            // Calculate x position to keep HUD centered
-            let xPos = screen.frame.midX - (newWidth / 2)
+            let xPos = screen.frame.midX - (targetWidth / 2)
             let yPos = screen.frame.minY + bottomPadding
             
-            // Animate the frame change
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.3
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 window.animator().setFrame(
-                    NSRect(x: xPos, y: yPos, width: newWidth, height: HUDLayout.height),
+                    NSRect(x: xPos, y: yPos, width: targetWidth, height: HUDLayout.height),
                     display: true
                 )
             }
@@ -474,6 +491,7 @@ public class HUDWindow: NSPanel {
 
 struct HUDMainView: View {
     @ObservedObject private var audioManager: AudioManager
+    @ObservedObject private var transcriptionService = AudioTranscriptionService.shared
     @StateObject private var animationState = HUDAnimationState()
     @StateObject var interactionState = HUDInteractionState()
     @Environment(\.colorScheme) private var colorScheme

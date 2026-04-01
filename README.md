@@ -1,141 +1,50 @@
 <div align="center">
   <img src="assets/icon.png" alt="No-Typing Icon" width="120" height="120">
   
-  # No-Typing - Local Speech-to-Text for macOS
+  # No-Typing - Open Source Speech-to-Text for macOS
 </div>
 
-No-Typing is a powerful macOS application that runs Whisper AI locally to provide fast, private speech-to-text transcription. Replace typing with natural speech - just hold a hotkey, speak, and watch your words appear instantly.
+No-Typing is a powerful, open-source macOS application that provides fast speech-to-text transcription. Replace typing with natural speech - just hold down a hotkey, speak, and watch your words appear instantly. It supports both **Local, privacy-first AI** via Whisper, and **Lightning-fast Cloud AI** via top providers.
 
-## Key Features
+## ✨ Key Features
 
-### 🎯 Smart Voice Activity Detection
-- Only transcribes when you're actually speaking
-- Filters out background noise (TV, music, conversations)
-- Visual feedback shows when speech is detected via HUD effects
+### 🎙️ Flexible Recording Modes
+- **Push-to-Talk Mode**: Hold the hotkey to record, release to transcribe and insert text. Perfect for quick thoughts and commands.
+- **Streaming Mode**: Press hotkey to start recording, press again to stop. Ideal for longer dictation sessions.
 
-### 🎙️ Two Recording Modes
-
-**Manual Mode**
-- Hold hotkey to record
-- Release to transcribe and insert text
-- Perfect for quick thoughts and commands
-
-**Streaming Mode**
-- Toggle recording on/off with hotkey
-- Automatically detects pauses in speech
-- Configurable pause detection duration
-- Inserts text segment-by-segment
-- Ideal for quiet environments and longer dictation
-
-### 🤖 AI-Powered Text Processing
-- Leverages macOS 15's foundation models
-- Rewrite transcribed text in different tones
-- Multiple tone options available
-
-### 🔐 Privacy First
-- Runs entirely offline using local Whisper models
-- No data leaves your device
-- Your speech stays private
+### 🧠 Bring Your Own AI Models
+- **Local Transcriptions**: Runs completely offline using Whisper AI. No data leaves your Mac, ensuring maximum privacy.
+- **Cloud Transcriptions**: Supercharge your speed and accuracy using top-tier Cloud providers like OpenAI, Deepgram, Anthropic, and Groq by bringing your own API keys.
+- **Cloud Translation**: Seamlessly translate spoken words into other languages using DeepL integration.
 
 ### ⚡ Native macOS Integration
-- Seamless text insertion into any app
-- App-aware functionality
-- Accessibility API integration
-- System-wide hotkey support
+- **Accessibility Integration**: Transcribed text is seamlessly inserted directly into whatever app you are currently using.
+- **System-wide Hotkey**: Works anywhere, anytime.
 
-## Installation
+### 🔐 Privacy Focused & Open Source
+- Your data remains yours. Inspect the codebase freely, and rest easy knowing we don't harvest your data. Use local models for air-gapped security, or your own secure API keys for cloud providers.
+
+## 🚀 Installation
 
 ### Download Pre-built App
+1. Go to our [GitHub Releases](https://github.com/no-typing/no-typing-mac/releases) page and download the latest `.dmg` file.
+2. Open the DMG and drag No-Typing to your Applications folder.
+3. Launch No-Typing and follow the onboarding wizard to grant the necessary Microphone and Accessibility permissions.
 
-1. Download the latest release from [no_typing.com](https://www.no_typing.com/)
-2. Open the DMG and drag No-Typing to Applications
-3. Launch No-Typing and grant necessary permissions:
-   - Microphone access
-   - Accessibility permissions
-   - Dictation permissions
-
-### Building from Source
-
-To run No-Typing locally on your Mac:
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/no-typing/no-typing-mac.git
-   cd no_typing
-   ```
-
-2. **Open in Xcode**
-   ```bash
-   open no_typing.xcodeproj
-   ```
-
-3. **Configure signing**
-   - Select the project in Xcode
-   - Go to "Signing & Capabilities" tab
-   - Select your development team
-   - Xcode will automatically manage the provisioning profile
-
-4. **Select the target**
-   - Choose "no_typing MacOS" scheme from the dropdown
-   - Select your Mac as the destination
-
-5. **Build and run**
-   - Press `⌘R` or click the Run button
-   - The app will build and launch automatically
-
-## Usage
-
-1. **Set your hotkey** in Settings (default: Option key)
-2. **Select recording mode**:
-   - Manual: Hold hotkey → Speak → Release
-   - Streaming: Press hotkey → Speak naturally → Press again to stop
-
-## Building from Source
-
+### Build from Source
 ```bash
-# Clone the repository
 git clone https://github.com/no-typing/no-typing-mac.git
-cd no_typing
-
-# Open in Xcode
-open no_typing.xcodeproj
-
-# Build for macOS
-xcodebuild -scheme "no_typing MacOS" -configuration Release build
+cd no-typing-mac
+open "no_typing.xcodeproj"
 ```
+Select the `no_typing MacOS` scheme in Xcode, choose your local Mac as the run destination, and hit `⌘R`.
 
-### How to Contribute
+## 🤝 Contributing
+We love our open-source community! Whether you want to fix a bug, add a new cloud provider, or improve the UI, please see our [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to set up your development environment and submit pull requests.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow existing Swift/SwiftUI patterns
-- Add tests for new features
-- Update documentation
-- Keep privacy and offline-first principles
-
-## Technical Stack
-
-- **Language**: Swift/SwiftUI
-- **AI Model**: Whisper (via whisper.cpp)
-- **Platforms**: macOS 14+, iOS support in progress
-- **Key Frameworks**: AVFoundation, Accessibility, Speech
-
-## Acknowledgments
-
-- [OpenAI Whisper](https://github.com/openai/whisper) for the amazing speech recognition model
+## 🙏 Acknowledgments
+- [OpenAI Whisper](https://github.com/openai/whisper) 
 - [whisper.cpp](https://github.com/ggerganov/whisper.cpp) for the efficient C++ implementation
-- All our contributors and community members
 
----
-
-<div align="center">
-  <img src="assets/icon.png" alt="No-Typing Icon" width="80" height="80">
-  
-  Built with ❤️ by the No-Typing developers. Let's revolutionize how we interact with our computers through speech!
-</div>
+## 📜 License
+No-Typing is released under the MIT License. See the LICENSE file for details.

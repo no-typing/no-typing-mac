@@ -1,111 +1,40 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides architectural guidance for AI assistants (like Claude, Gemini, ChatGPT) when working with the No-Typing repository. Use this to orient yourself within the codebase.
 
-## Build and Development Commands
+## 🏗️ Architecture Overview
 
-### Building the Application
+No-Typing is a macOS native application written in Swift and SwiftUI. It bridges low-level audio recording and system-hooking APIs with modern SwiftUI interfaces.
 
-```bash
-# Open in Xcode
-open no_typing.xcodeproj
+### Core Services Structure
 
-# Build macOS app via command line
-xcodebuild -scheme "no_typing MacOS" -configuration Release build
-
-# Build iOS app via command line  
-xcodebuild -scheme "no_typing" -configuration Release build
-```
-
-### Building Whisper Executable
-
-The app uses a custom-built Whisper executable. To rebuild it:
-
-```bash
-# Clone whisper.cpp
-git clone https://github.com/ggerganov/whisper.cpp.git
-cd whisper.cpp
-
-# Build for Apple Silicon
-make clean
-WHISPER_STATIC=1 make -j
-
-# Copy to project
-cp main /path/to/native-whisper/Resources/Whisper/whisper
-
-# Code sign (required for distribution)
-codesign --force --options runtime --sign "Developer ID Application: YOUR_NAME (YOUR_TEAM_ID)" /path/to/native-whisper/Resources/Whisper/whisper
-```
-
-### Distribution and Notarization
-
-```bash
-# Store notarization credentials (one-time setup)
-xcrun notarytool store-credentials "AC_PASSWORD" \
-  --apple-id "your-apple-id@example.com" \
-  --team-id "YOUR_TEAM_ID" \
-  --password "your-app-specific-password"
-
-# After exporting from Xcode, notarize the app
-xcrun notarytool submit "No-Typing.zip" --wait --keychain-profile "AC_PASSWORD"
-
-# Staple the notarization ticket
-xcrun stapler staple "No-Typing.app"
-
-# Sign update for Sparkle
-cd ~/Library/Developer/Xcode/DerivedData/no_typing-*/SourcePackages/artifacts/sparkle/Sparkle/bin
-./sign_update --ed-key-file /path/to/your/private/key.pem /path/to/No-Typing.zip
-```
-
-## Architecture Overview
-
-### Core Services Architecture
-
-The app follows a singleton service pattern with the following key managers:
-
-- **AudioManager** (`no_typing MacOS/Services/AudioManager.swift`) - Coordinates audio recording and manages recording state
-- **WhisperManager** (`no_typing MacOS/Services/WhisperManager.swift`) - Handles Whisper model downloads and transcription
-- **AudioTranscriptionService** (`no_typing MacOS/Services/AudioTranscriptionService.swift`) - Main service coordinating audio capture and transcription
-- **TextInsertionService** (`no_typing MacOS/Services/TextInsertionService.swift`) - Handles inserting transcribed text using multiple strategies (clipboard, typing, accessibility)
-- **GlobalHotkeyManager** (`no_typing MacOS/Services/GlobalHotkeyManager.swift`) - Manages system-wide Fn key detection
-- **AuthenticationManager** (`no_typing MacOS/Services/AuthenticationManager.swift`) - OAuth authentication with Google
-- **TextProcessingService** (`no_typing MacOS/Services/TextProcessingService.swift`) - AI-powered text rewriting with tone options
+- **`WhisperManager.swift`**: Handles the downloading and file management of local Whisper AI models.
+- **`CloudTranscriptionManager.swift`**: Manages API-based transcription requests to third-party providers (OpenAI, Deepgram, Anthropic, Groq, DeepL).
+- **`AudioManager.swift`**: Interfaces with `AVFoundation` for capturing multi-channel microphone input.
+- **`AudioTranscriptionService.swift`**: The orchestrator that routes captured audio to either the local Whisper pipeline or the selected cloud provider based on the user's `@AppStorage` preferences.
+- **`TextInsertionService.swift`**: Core utility that utilizes macOS Accessibility APIs (`AXUIElement`) to simulate typing or pasting transcribed text directly into the user's active application.
+- **`GlobalHotkeyManager.swift`**: Detects system-wide keyboard events (like the `Option` or `Fn` key) even when the app is in the background, relying on Accessibility permissions.
 
 ### UI Architecture
 
-The app uses SwiftUI with a floating HUD interface:
+- **`UnifiedSettingsView.swift`**: The main settings window containing organized tabs for Models, Cloud Services, General settings, Shortcuts, and Support.
+- **`UIComponents.swift`** (`no_typing MacOS/Components/Common/UIComponents.swift`): Centralized repository of reusable SwiftUI components (`CustomTextField`, `PrimaryButton`, `SectionHeaderView`, `SettingsSectionView`). **Always use these components for new views to maintain visual consistency.**
+- **`OnboardingView.swift`**: Multi-step SwiftUI view that guides users through granting permissions (Microphone & Accessibility) and downloading local models.
+- **`HUDMainComponent.swift`**: The floating UI interface that appears dynamically when the hotkey is triggered.
 
-- **HUDMainComponent** (`no_typing MacOS/HUD Components/HUDMainComponent.swift`) - Main floating window interface
-- **SettingsView** (`no_typing MacOS/View/SettingsView.swift`) - App preferences and configuration
-- **TranscriptionView** (`no_typing MacOS/View/TranscriptionView.swift`) - Real-time transcription display
+## 🛠️ Build Information
 
-### Key Design Patterns
+```bash
+# Build the macOS app via command line
+xcodebuild -scheme "no_typing MacOS" -configuration Debug build
+```
 
-1. **State Management**: Uses `@Published` properties in ObservableObject services
-2. **Audio Pipeline**: 
-   - AudioSessionManager → AudioBufferManager → WhisperManager
-   - Supports both streaming and standard transcription modes
-3. **Text Insertion Strategy Pattern**: Multiple methods for inserting text into other apps
-4. **Auto-update**: Sparkle framework integration for seamless updates
+The app relies heavily on Apple Silicon / macOS Foundation frameworks and `whisper.cpp` integrations under the hood for local processing.
 
-### Platform-Specific Code
+## 🧹 Codebase Rules & AI Agent Instructions
 
-- macOS-specific code in `no_typing MacOS/` directory
-- iOS-specific code in `no_typing iOS/` directory
-- Shared services and models between platforms where applicable
-
-### Whisper Model Management
-
-The app downloads and manages Whisper models dynamically:
-- Models stored in `~/Documents/no_typing/models/`
-- Supports Base, Small, and Medium models
-- Automatic model download on first use
-
-### Permissions and Security
-
-The app requires several system permissions:
-- Microphone access for audio recording
-- Accessibility permissions for text insertion
-- Screen recording permissions (for certain features)
-
-All handled through the standard macOS permission system with appropriate Info.plist entries.
+1. **Permissions Matter**: The app relies fundamentally on macOS `Accessibility` and `Microphone` permissions. When modifying initialization code or hotkey behaviors, ensure permission checks (via `PermissionManager.swift`) are not bypassed or broken.
+2. **State Management Protocol**: The app uses `ObservableObject` and `@Published` properties for shared services (singletons like `WhisperManager.shared`), and `@AppStorage` for persisting UI state and user settings. Avoid tight coupling between services.
+3. **Open Source & Privacy First**: Do not commit secrets, API keys, or proprietary backend integrations. The app allows users to supply their own API keys via the settings UI ("BYOK - Bring Your Own Key").
+4. **No Legacy Authentication**: The app is strictly offline-first or BYOK. In previous iterations, proprietary OAuth/backend sign-in flows existed. These have been deleted. Do not re-introduce centralized user authentication mechanisms or user database integrations.
+5. **Component Reusability**: When asked to create or refactor settings screens, aggressively use the components defined in `UIComponents.swift`. Avoid inline `.padding()`, `.background()`, or `.cornerRadius()` modifiers if a pre-built component handles it.

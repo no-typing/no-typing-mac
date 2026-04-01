@@ -2,7 +2,7 @@
 
 This file provides architectural guidance for AI assistants (like Claude, Gemini, ChatGPT) when working with the No-Typing repository. Use this to orient yourself within the codebase.
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 No-Typing is a macOS native application written in Swift and SwiftUI. It bridges low-level audio recording and system-hooking APIs with modern SwiftUI interfaces.
 
@@ -22,7 +22,7 @@ No-Typing is a macOS native application written in Swift and SwiftUI. It bridges
 - **`OnboardingView.swift`**: Multi-step SwiftUI view that guides users through granting permissions (Microphone & Accessibility) and downloading local models.
 - **`HUDMainComponent.swift`**: The floating UI interface that appears dynamically when the hotkey is triggered.
 
-## 🛠️ Build Information
+## Build Information
 
 ```bash
 # Build the macOS app via command line
@@ -31,7 +31,7 @@ xcodebuild -scheme "no_typing MacOS" -configuration Debug build
 
 The app relies heavily on Apple Silicon / macOS Foundation frameworks and `whisper.cpp` integrations under the hood for local processing.
 
-## 🧹 Codebase Rules & AI Agent Instructions
+## Codebase Rules & AI Agent Instructions
 
 1. **Permissions Matter**: The app relies fundamentally on macOS `Accessibility` and `Microphone` permissions. When modifying initialization code or hotkey behaviors, ensure permission checks (via `PermissionManager.swift`) are not bypassed or broken.
 2. **State Management Protocol**: The app uses `ObservableObject` and `@Published` properties for shared services (singletons like `WhisperManager.shared`), and `@AppStorage` for persisting UI state and user settings. Avoid tight coupling between services.

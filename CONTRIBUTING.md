@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to No-Typing! We're building the best open-source speech-to-text tool for macOS, and community contributions are highly valued. Whether it's adding a new cloud provider, fixing a bug, or polishing the UI, we're excited to see what you build.
 
-## 🐛 Reporting Bugs
+## Reporting Bugs
 Before creating bug reports, please check existing GitHub issues to avoid duplicates. If you create a new bug report, include:
 * A clear and descriptive title
 * Exact steps to reproduce the issue
@@ -10,13 +10,13 @@ Before creating bug reports, please check existing GitHub issues to avoid duplic
 * Your macOS version and Mac hardware (Intel or Apple Silicon)
 * Screenshots or videos (if applicable)
 
-## 💡 Suggesting Enhancements
+## Suggesting Enhancements
 We track feature requests as GitHub issues. Please provide:
 * A clear and descriptive title
 * Details of the proposed enhancement and why it is useful to the broader community
 * Any potential UI/UX examples or mockups
 
-## 🛠️ Development Setup
+## Development Setup
 
 1. **Fork the Repository**: Create your own fork and clone it locally.
 2. **Open the Project**: Open `no_typing.xcodeproj` in Xcode (requires Xcode 15+).
@@ -34,14 +34,14 @@ If integrating a new transcription or translation provider (e.g. Gemini, Azure, 
 * Add the logic inside the `Services/` directory, following existing patterns found in `CloudTranscriptionManager.swift`.
 * Provide a configuration view in the Settings menu that uses secure `@AppStorage` for storing user-provided API keys. Keep the UI consistent by adapting `UIComponents`.
 
-## 🔀 Pull Request Process
+## Pull Request Process
 1. Create a feature branch: `git checkout -b feature/my-new-feature` or `git checkout -b fix/issue-name`.
 2. Commit your changes logically with clean, descriptive commit messages.
 3. Push your branch to your fork.
 4. Open a Pull Request against our `main` branch.
 5. Ensure your code compiles without warnings, follows the existing Swift code style, and doesn't break core app permissions.
 
-## 🎨 Code Style Guides
+## Code Style Guides
 ### Swift
 * Use 4 spaces for indentation.
 * Prefer standard SwiftUI constructs (`VStack`, `HStack`, etc.).

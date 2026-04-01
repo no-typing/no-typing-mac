@@ -8,58 +8,25 @@ struct DeepLSettingsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("DeepL API Key")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Text("Insert your DeepL Developer API key to unlock full transcript translation. Both Free and Pro keys are supported.")
-                    .font(.subheadline)
-                    .foregroundColor(ThemeColors.secondaryText)
-            }
+            SectionHeaderView(
+                title: "DeepL API Key",
+                description: "Insert your DeepL Developer API key to unlock full transcript translation. Both Free and Pro keys are supported."
+            )
             
             HStack(spacing: 12) {
-                SecureField("Enter DeepL Auth Key (e.g. ...:fx)", text: $deeplApiKey)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .padding()
-                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
+                CustomSecureField(placeholder: "Enter DeepL Auth Key (e.g. ...:fx)", text: $deeplApiKey)
                 
-                Button(action: {
-                    testAPIKey()
-                }) {
-                    HStack {
-                        if isTestRunning {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                        Text(isTestRunning ? "Testing..." : "Test Key")
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(deeplApiKey.isEmpty ? Color.gray.opacity(0.3) : ThemeColors.accent)
-                    .foregroundColor(deeplApiKey.isEmpty ? .gray : .white)
-                    .cornerRadius(8)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(deeplApiKey.isEmpty || isTestRunning)
+                PrimaryButton(
+                    title: "Test Key",
+                    loadingTitle: "Testing...",
+                    isLoading: isTestRunning,
+                    isDisabled: deeplApiKey.isEmpty,
+                    action: testAPIKey
+                )
             }
             
             if let status = testStatus {
-                HStack(spacing: 6) {
-                    Image(systemName: isTestSuccessful ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(isTestSuccessful ? .green : .red)
-                    
-                    Text(status)
-                        .font(.caption)
-                        .foregroundColor(isTestSuccessful ? .green : .red)
-                }
-                .transition(.opacity)
+                APIKeyStatusView(status: status, isSuccess: isTestSuccessful)
             }
         }
         .padding(20)

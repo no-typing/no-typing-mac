@@ -297,11 +297,7 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 1: Sign-In Screen
-    /// Displays the initial sign-in options for users
-    var stepOneSignIn: some View {
-        SignInView()
-    }
+
 
     // MARK: - Step 2: Model Selection and Data Privacy
     /// Allows users to select the Whisper model and informs them about local processing and data privacy

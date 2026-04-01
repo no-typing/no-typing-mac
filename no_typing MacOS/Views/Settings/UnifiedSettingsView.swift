@@ -13,6 +13,12 @@ struct UnifiedSettingsView: View {
     @AppStorage("enableHotkeys") private var enableHotkeys = true
     @AppStorage("selectedLanguage") private var selectedLanguage: String = "auto"
     @AppStorage("cloudTranscriptionEnabled") private var useCloudEngine: Bool = false
+    @AppStorage("cloudTranscriptionProvider") private var cloudProviderString: String = "Deepgram"
+    @AppStorage("cloudOpenAIModel") private var cloudOpenAIModel: String = "whisper-1"
+    @AppStorage("cloudElevenLabsModel") private var cloudElevenLabsModel: String = "scribe_v1"
+    @AppStorage("cloudDeepgramModel") private var cloudDeepgramModel: String = "nova-2"
+    @AppStorage("cloudGroqModel") private var cloudGroqModel: String = "whisper-large-v3-turbo"
+    @AppStorage("cloudCustomModel") private var cloudCustomModel: String = "whisper-1"
     
     enum SettingsSection: String, CaseIterable {
         case recentActivity = "Activity"
@@ -136,42 +142,16 @@ struct UnifiedSettingsView: View {
                     .padding(.trailing, 0)
                     .help("Enable or disable global recording hotkeys")
 
-                    Menu {
-                        ForEach(whisperManager.availableModels) { model in
-                            Button(action: {
-                                if model.isAvailable {
-                                    whisperManager.selectedModelSize = model.id
-                                } else {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        selectedSection = .modelSettings
-                                    }
-                                    whisperManager.downloadModel(modelSize: model.id)
-                                }
-                            }) {
-                                HStack {
-                                    Text(model.displayInfo.displayName)
-                                    if !model.isAvailable {
-                                        Image(systemName: "icloud.and.arrow.down")
-                                    } else if whisperManager.selectedModelSize == model.id {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
+                    if useCloudEngine {
+                        // Cloud model: non-interactive label showing active provider + model
                         HStack(spacing: 6) {
-                            if let current = whisperManager.availableModels.first(where: { $0.id == whisperManager.selectedModelSize }) {
-                                Text(current.displayInfo.displayName)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white)
-                            } else {
-                                Text("Select Model")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white)
-                            }
-                            Image(systemName: "waveform.circle")
+                            Image(systemName: "cloud.fill")
                                 .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(.cyan)
+                            Text(activeCloudModelDisplayName)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -179,11 +159,60 @@ struct UnifiedSettingsView: View {
                         .cornerRadius(8)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
                         )
+                        .frame(minWidth: 140)
+                        .help("Cloud transcription active: \(cloudProviderString)")
+                    } else {
+                        Menu {
+                            ForEach(whisperManager.availableModels) { model in
+                                Button(action: {
+                                    if model.isAvailable {
+                                        whisperManager.selectedModelSize = model.id
+                                    } else {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            selectedSection = .modelSettings
+                                        }
+                                        whisperManager.downloadModel(modelSize: model.id)
+                                    }
+                                }) {
+                                    HStack {
+                                        Text(model.displayInfo.displayName)
+                                        if !model.isAvailable {
+                                            Image(systemName: "icloud.and.arrow.down")
+                                        } else if whisperManager.selectedModelSize == model.id {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                if let current = whisperManager.availableModels.first(where: { $0.id == whisperManager.selectedModelSize }) {
+                                    Text(current.displayInfo.displayName)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.white)
+                                } else {
+                                    Text("Select Model")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.white)
+                                }
+                                Image(systemName: "waveform.circle")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                        }
+                        .frame(width: 140)
+                        .help("Select transcription model")
                     }
-                    .frame(width: 140)
-                    .help("Select transcription model")
                     
                     SearchableLanguagePicker(selection: $selectedLanguage, languages: TranscriptionLanguage.all)
                         .frame(width: 150)
@@ -286,6 +315,20 @@ struct UnifiedSettingsView: View {
         .buttonStyle(.plain)
     }
 
+    /// Returns a display name combining the cloud provider and its active model, e.g. "Deepgram · nova-2"
+    private var activeCloudModelDisplayName: String {
+        let provider = CloudTranscriptionProvider(rawValue: cloudProviderString) ?? .deepgram
+        let model: String
+        switch provider {
+        case .openai:     model = cloudOpenAIModel
+        case .elevenlabs:  model = cloudElevenLabsModel
+        case .deepgram:   model = cloudDeepgramModel
+        case .groq:       model = cloudGroqModel
+        case .custom:     model = cloudCustomModel
+        }
+        return "\(provider.rawValue) · \(model)"
+    }
+
     private func checkForIssues() {
         // Check permissions
         PermissionManager.shared.checkMicrophonePermission { micGranted in
@@ -309,13 +352,7 @@ struct UnifiedSettingsView: View {
     // MARK: - History Section
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Section Header
-            VStack(alignment: .leading, spacing: 4) {
-                Text("My Activity")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
-             }
-            .padding(.bottom, 8)
+            PageTitleView(title: "My Activity")
             
             TranscriptionHistoryView()
                 .settingsCardStyle()
@@ -325,13 +362,7 @@ struct UnifiedSettingsView: View {
     // MARK: - Model Settings Section
     private var modelSettingsSection: some View {
         LazyVStack(alignment: .leading, spacing: 16) {
-            // Section Header
-            HStack(alignment: .bottom) {
-                Text("Model Settings")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
-            }
-            .padding(.bottom, 8)
+            PageTitleView(title: "Model Settings")
             
             WhisperModelSelectionView(
                 showTitle: false,
@@ -344,17 +375,7 @@ struct UnifiedSettingsView: View {
     // MARK: - Hotkeys Section
     private var hotkeysSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Section Header
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Hotkeys")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Text("Configure your keyboard shortcuts")
-                    .font(.subheadline)
-                    .foregroundColor(ThemeColors.secondaryText)
-            }
-            .padding(.bottom, 8)
+            PageTitleView(title: "Hotkeys", subtitle: "Configure your keyboard shortcuts")
             
             HotKeysView()
                 .settingsCardStyle()
@@ -364,17 +385,10 @@ struct UnifiedSettingsView: View {
     // MARK: - Text Replacements Section
     private var magicActionsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Section Header
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Magic Actions")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Text("Replace specific text with your preferred alternatives, including name variations")
-                    .font(.subheadline)
-                    .foregroundColor(ThemeColors.secondaryText)
-            }
-            .padding(.bottom, 8)
+            PageTitleView(
+                title: "Magic Actions",
+                subtitle: "Replace specific text with your preferred alternatives, including name variations"
+            )
             
             MagicActionsView()
                 .settingsCardStyle()
@@ -392,17 +406,10 @@ struct UnifiedSettingsView: View {
     // MARK: - App Settings Section
     private var appSettingsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Section Header
-            VStack(alignment: .leading, spacing: 4) {
-                Text("App Settings")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Text("Configure general application settings")
-                    .font(.subheadline)
-                    .foregroundColor(ThemeColors.secondaryText)
-            }
-            .padding(.bottom, 8)
+            PageTitleView(
+                title: "App Settings",
+                subtitle: "Configure general application settings"
+            )
             
             AppSetupView()
                 .settingsCardStyle()

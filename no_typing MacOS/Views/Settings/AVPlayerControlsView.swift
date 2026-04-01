@@ -26,14 +26,10 @@ struct AVPlayerControlsView: View {
             
             // Custom Controls overlay or below
             HStack(spacing: 16) {
-                Button(action: {
-                    viewModel.isPlaying ? viewModel.pause() : viewModel.play()
-                }) {
-                    Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title2)
-                        .foregroundColor(.primary)
-                }
-                .buttonStyle(PlainButtonStyle())
+                IconButton(
+                    iconName: viewModel.isPlaying ? "pause.fill" : "play.fill",
+                    action: { viewModel.isPlaying ? viewModel.pause() : viewModel.play() }
+                )
                 
                 // Scrub Bar
                 Slider(value: $viewModel.currentTime, in: 0...viewModel.duration) { editing in

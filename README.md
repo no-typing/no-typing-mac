@@ -60,7 +60,7 @@ To run No-Typing locally on your Mac:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/GiddyNaya/no_typing.git
+   git clone https://github.com/no-typing/no-typing-mac.git
    cd no_typing
    ```
 
@@ -94,7 +94,7 @@ To run No-Typing locally on your Mac:
 
 ```bash
 # Clone the repository
-git clone https://github.com/GiddyNaya/no_typing.git
+git clone https://github.com/no-typing/no-typing-mac.git
 cd no_typing
 
 # Open in Xcode

@@ -10,46 +10,21 @@ struct OpenAISettingsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("OpenAI (ChatGPT) API Key")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Text("Insert your OpenAI API key to unlock dynamic grammar dictation and rewriting capabilities. You can generate one at platform.openai.com.")
-                    .font(.subheadline)
-                    .foregroundColor(ThemeColors.secondaryText)
-            }
+            SectionHeaderView(
+                title: "OpenAI (ChatGPT) API Key",
+                description: "Insert your OpenAI API key to unlock dynamic grammar dictation and rewriting capabilities. You can generate one at platform.openai.com."
+            )
             
             HStack(spacing: 12) {
-                SecureField("sk-...", text: $openaiApiKey)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .padding()
-                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
+                CustomSecureField(placeholder: "sk-...", text: $openaiApiKey)
                 
-                Button(action: {
-                    testAPIKey()
-                }) {
-                    HStack {
-                        if isTestRunning {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                        Text(isTestRunning ? "Testing..." : "Test Key")
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(openaiApiKey.isEmpty ? Color.gray.opacity(0.3) : ThemeColors.accent)
-                    .foregroundColor(openaiApiKey.isEmpty ? .gray : .white)
-                    .cornerRadius(8)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(openaiApiKey.isEmpty || isTestRunning)
+                PrimaryButton(
+                    title: "Test Key",
+                    loadingTitle: "Testing...",
+                    isLoading: isTestRunning,
+                    isDisabled: openaiApiKey.isEmpty,
+                    action: testAPIKey
+                )
             }
             
             if !openaiApiKey.isEmpty {
@@ -70,15 +45,7 @@ struct OpenAISettingsView: View {
             }
             
             if let status = testStatus {
-                HStack(spacing: 6) {
-                    Image(systemName: isTestSuccessful ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(isTestSuccessful ? .green : .red)
-                    
-                    Text(status)
-                        .font(.caption)
-                        .foregroundColor(isTestSuccessful ? .green : .red)
-                }
-                .transition(.opacity)
+                APIKeyStatusView(status: status, isSuccess: isTestSuccessful)
             }
         }
         .padding(20)

@@ -25,14 +25,12 @@ struct AppSetupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             // Audio Input Source Section
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "mic.fill")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                    Text("Audio Input Source")
-                        .font(.title3)
-                        .foregroundColor(.white)
+            SettingsSectionView(
+                icon: "mic.fill",
+                title: "Audio Input Source",
+                description: "Select whether to record from your microphone or capture all system audio."
+            ) {
+                HStack {
                     Spacer()
                     Picker("Source", selection: $audioManager.inputSource) {
                         ForEach(AudioInputSource.allCases) { source in
@@ -41,28 +39,16 @@ struct AppSetupView: View {
                     }
                     .frame(width: 220)
                 }
-                
-                Text("Select whether to record from your microphone or capture all system audio.")
-                    .font(.body)
-                    .foregroundColor(ThemeColors.secondaryText)
             }
             
-            Divider().padding(.vertical, 8)
+            SectionDivider()
             
             // Permission Configuration Section
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "lock.shield")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                    Text("Permission Configuration")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                }
-                
-                Text("No-Typing needs microphone, accessibility, and speech detection permissions to function properly.")
-                    .font(.body)
-                    .foregroundColor(ThemeColors.secondaryText)
+            SettingsSectionView(
+                icon: "lock.shield",
+                title: "Permission Configuration",
+                description: "No-Typing needs microphone, accessibility, and speech detection permissions to function properly."
+            ) {
                 
                 VStack(alignment: .leading, spacing: 12) {
                     if microphonePermissionGranted {
@@ -105,19 +91,11 @@ struct AppSetupView: View {
             Divider().padding(.vertical, 8)
             
             // Startup Configuration Section
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "power")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                    Text("Startup Configuration")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                }
-                
-                Text("Configure how No-Typing behaves when your Mac starts up.")
-                    .font(.body)
-                    .foregroundColor(ThemeColors.secondaryText)
+            SettingsSectionView(
+                icon: "power",
+                title: "Startup Configuration",
+                description: "Configure how No-Typing behaves when your Mac starts up."
+            ) {
                 
                 VStack(alignment: .leading) {
                     SettingsToggleRow(
@@ -136,19 +114,11 @@ struct AppSetupView: View {
             Divider().padding(.vertical, 8)
             
             // Watch Folder Section
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "folder.badge.gearshape")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                    Text("Watch Folder")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                }
-                
-                Text("Automatically transcribe audio files dropped into this folder.")
-                    .font(.body)
-                    .foregroundColor(ThemeColors.secondaryText)
+            SettingsSectionView(
+                icon: "folder.badge.gearshape",
+                title: "Watch Folder",
+                description: "Automatically transcribe audio files dropped into this folder."
+            ) {
                 
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
@@ -165,17 +135,10 @@ struct AppSetupView: View {
                         
                         Spacer()
                         
-                        Button(action: {
-                            watchFolderManager.selectFolder()
-                        }) {
-                            Text(watchFolderManager.watchFolderPath == nil ? "Select Folder" : "Change Folder")
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.1))
-                                .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
+                        SecondaryButton(
+                            title: watchFolderManager.watchFolderPath == nil ? "Select Folder" : "Change Folder",
+                            action: { watchFolderManager.selectFolder() }
+                        )
                     }
                     
                     if watchFolderManager.watchFolderPath != nil {
@@ -193,19 +156,11 @@ struct AppSetupView: View {
             Divider().padding(.vertical, 8)
             
             // Sound Settings Section
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "speaker.wave.3")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                    Text("Sound Settings")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                }
-                
-                Text("Configure sound effects for the HUD display.")
-                    .font(.body)
-                    .foregroundColor(ThemeColors.secondaryText)
+            SettingsSectionView(
+                icon: "speaker.wave.3",
+                title: "Sound Settings",
+                description: "Configure sound effects for the HUD display."
+            ) {
                 
                 VStack(alignment: .leading) {
                     SettingsToggleRow(
@@ -221,14 +176,12 @@ struct AppSetupView: View {
             Divider().padding(.vertical, 8)
             
             // Voice Webhook Section
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                    Text("Voice Webhook")
-                        .font(.title3)
-                        .foregroundColor(.white)
+            SettingsSectionView(
+                icon: "antenna.radiowaves.left.and.right",
+                title: "Voice Webhook",
+                description: "Forward voice transcription results to the selected webhook endpoint."
+            ) {
+                HStack {
                     Spacer()
                     Picker("Webhook", selection: Binding(
                         get: { voiceWebhookEndpointId },
@@ -244,10 +197,6 @@ struct AppSetupView: View {
                     }
                     .frame(width: 220)
                 }
-                
-                Text("Forward voice transcription results to the selected webhook endpoint.")
-                    .font(.body)
-                    .foregroundColor(ThemeColors.secondaryText)
             }
 
         }

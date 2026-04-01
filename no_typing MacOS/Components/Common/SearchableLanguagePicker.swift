@@ -31,7 +31,7 @@ struct SearchableLanguagePicker: View {
                     .foregroundColor(.white)
                 Spacer()
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 11)
+                    .font(.system(size: 11))
                     .foregroundColor(.white)
             }
             .padding(.horizontal, 10)

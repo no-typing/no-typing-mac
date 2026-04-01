@@ -10,46 +10,21 @@ struct AnthropicSettingsView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Anthropic (Claude) API Key")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Text("Insert your Anthropic API key to utilize Claude for grammar dictation and text refinement. You can generate one at console.anthropic.com.")
-                    .font(.subheadline)
-                    .foregroundColor(ThemeColors.secondaryText)
-            }
+            SectionHeaderView(
+                title: "Anthropic (Claude) API Key",
+                description: "Insert your Anthropic API key to utilize Claude for grammar dictation and text refinement. You can generate one at console.anthropic.com."
+            )
             
             HStack(spacing: 12) {
-                SecureField("sk-ant-...", text: $anthropicApiKey)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .padding()
-                    .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
+                CustomSecureField(placeholder: "sk-ant-...", text: $anthropicApiKey)
                 
-                Button(action: {
-                    testAPIKey()
-                }) {
-                    HStack {
-                        if isTestRunning {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                        Text(isTestRunning ? "Testing..." : "Test Key")
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(anthropicApiKey.isEmpty ? Color.gray.opacity(0.3) : ThemeColors.accent)
-                    .foregroundColor(anthropicApiKey.isEmpty ? .gray : .white)
-                    .cornerRadius(8)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(anthropicApiKey.isEmpty || isTestRunning)
+                PrimaryButton(
+                    title: "Test Key",
+                    loadingTitle: "Testing...",
+                    isLoading: isTestRunning,
+                    isDisabled: anthropicApiKey.isEmpty,
+                    action: testAPIKey
+                )
             }
             
             if !anthropicApiKey.isEmpty {
@@ -70,15 +45,7 @@ struct AnthropicSettingsView: View {
             }
             
             if let status = testStatus {
-                HStack(spacing: 6) {
-                    Image(systemName: isTestSuccessful ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(isTestSuccessful ? .green : .red)
-                    
-                    Text(status)
-                        .font(.caption)
-                        .foregroundColor(isTestSuccessful ? .green : .red)
-                }
-                .transition(.opacity)
+                APIKeyStatusView(status: status, isSuccess: isTestSuccessful)
             }
         }
         .padding(20)

@@ -145,24 +145,7 @@ struct TranscriptDetailView: View {
     // MARK: - Controls
     private var controlsView: some View {
         HStack {
-            // Search Bar
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(ThemeColors.secondaryText)
-                TextField("Search transcript...", text: $searchText)
-                    .textFieldStyle(PlainTextFieldStyle())
-                
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(ThemeColors.secondaryText)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(8)
-            .background(Color.black.opacity(0.2))
-            .cornerRadius(8)
+            SearchBar(placeholder: "Search transcript...", text: $searchText)
             
             // Start Time Offset
             HStack {

@@ -1,229 +1,147 @@
 import SwiftUI
 
-enum FeedbackType: String, CaseIterable, Identifiable {
-    case bugReport = "Bug Report"
-    case featureRequest = "Feature Request"
-    case generalFeedback = "General Feedback"
-    
-    var id: String { self.rawValue }
-}
-
 struct SupportView: View {
-    @State private var feedbackType: FeedbackType = .generalFeedback
-    @State private var feedbackText = ""
-    @State private var stepsToReproduce = ""
-    @State private var attachLogs = true
+    // TODO: Update this to your actual GitHub repository URL
+    private let repoURL = "https://github.com/no-typing/no-typing-mac"
     
     @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) { 
+        VStack(alignment: .leading, spacing: 24) {
             // Header Section
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Help & Feedback")
+                    Text("Support & Community")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                     
-                    Text("Got questions or suggestions? Let us know!")
+                    Text("No-Typing is open source. Report issues, request features, or contribute on GitHub.")
                         .font(.body)
-                }
-            }
-            Divider()
-            
-            // Type Selection
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Feedback Type")
-                    .font(.headline)
-                    .foregroundColor(ThemeColors.secondaryText)
-                
-                Picker("", selection: $feedbackType) {
-                    ForEach(FeedbackType.allCases) { type in
-                        Text(type.rawValue).tag(type)
-                    }
-                }
-                .pickerStyle(.radioGroup)
-                .labelsHidden()
-            }
-            
-            // Description
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Description")
-                    .font(.headline)
-                    .foregroundColor(ThemeColors.secondaryText)
-                
-                descriptionHelperText()
-                    .font(.subheadline)
-                    .foregroundColor(ThemeColors.secondaryText)
-                    .padding(.bottom, 4)
-                
-                ZStack(alignment: .bottomTrailing) {
-                    ZStack(alignment: .topLeading) {
-                        TextEditor(text: $feedbackText)
-                            .font(.system(.body))
-                            .frame(height: 180)
-                            .padding(8)
-                            .background(Color(NSColor.textBackgroundColor))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                            )
-                        
-                        if feedbackText.isEmpty {
-                            Text(descriptionPlaceholder())
-                                .foregroundColor(ThemeColors.secondaryText.opacity(0.5))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 16)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                    
-                    Text("\(feedbackText.count)/50")
-                        .font(.caption)
-                        .foregroundColor(feedbackText.count < 50 ? .red.opacity(0.7) : ThemeColors.secondaryText)
-                        .padding(12)
-                }
-            }
-            
-            // Steps to Reproduce (Only for Bug Report)
-            if feedbackType == .bugReport {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Steps to Reproduce")
-                        .font(.headline)
                         .foregroundColor(ThemeColors.secondaryText)
-                    
-                    ZStack(alignment: .bottomTrailing) {
-                        ZStack(alignment: .topLeading) {
-                            TextEditor(text: $stepsToReproduce)
-                                .font(.system(.body))
-                                .frame(height: 100)
-                                .padding(8)
-                                .background(Color(NSColor.textBackgroundColor))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                                )
-                            
-                            if stepsToReproduce.isEmpty {
-                                Text("Please list the steps to reproduce the issue")
-                                    .foregroundColor(ThemeColors.secondaryText.opacity(0.5))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 16)
-                                    .allowsHitTesting(false)
-                            }
-                        }
-                        
-                        Text("\(stepsToReproduce.count)/20")
-                            .font(.caption)
-                            .foregroundColor(stepsToReproduce.count < 20 ? .red.opacity(0.7) : ThemeColors.secondaryText)
-                            .padding(12)
-                    }
                 }
             }
             
-            // Attach Logs Checkbox
-            Toggle(isOn: $attachLogs) {
-                Text("Attach No-Typing app logs")
-                    .foregroundColor(.white)
-            }
-            .toggleStyle(.checkbox)
-            .padding(.top, 8)
+            Divider().background(Color.white.opacity(0.1))
             
+            // Quick Action Cards
+            VStack(spacing: 12) {
+                supportCard(
+                    icon: "ant.fill",
+                    iconColor: .red,
+                    title: "Report a Bug",
+                    description: "Found something broken? Open an issue on GitHub with steps to reproduce.",
+                    buttonTitle: "Open Bug Report",
+                    url: "\(repoURL)/issues/new?template=bug_report.md&labels=bug"
+                )
+                
+                supportCard(
+                    icon: "lightbulb.fill",
+                    iconColor: .yellow,
+                    title: "Request a Feature",
+                    description: "Have an idea to improve No-Typing? We'd love to hear it.",
+                    buttonTitle: "Open Feature Request",
+                    url: "\(repoURL)/issues/new?template=feature_request.md&labels=enhancement"
+                )
+                
+                supportCard(
+                    icon: "text.bubble.fill",
+                    iconColor: .blue,
+                    title: "Discussions",
+                    description: "Ask questions, share tips, or connect with other users.",
+                    buttonTitle: "Join Discussions",
+                    url: "\(repoURL)/discussions"
+                )
+            }
+            
+            Divider().background(Color.white.opacity(0.1))
+            
+            // Repository Link
+            HStack(spacing: 12) {
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    .font(.system(size: 20))
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(8)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Source Code")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                    Text(repoURL)
+                        .font(.system(size: 12))
+                        .foregroundColor(ThemeColors.secondaryText)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                SecondaryButton(title: "View on GitHub") {
+                    if let url = URL(string: repoURL) {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
+            
+            // Version Info
             HStack {
                 Spacer()
-                Button(action: sendFeedback) {
-                    HStack {
-                        Image(systemName: "paperplane.fill")
-                        Text("Send Feedback")
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+                   let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+                    Text("No-Typing v\(version) (\(build))")
+                        .font(.caption)
+                        .foregroundColor(ThemeColors.secondaryText)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
-                .disabled(!isFormValid())
+                Spacer()
             }
+            .padding(.top, 8)
         }
         .padding(.top, 16)
         .background(Color.clear)
     }
     
-    private func isFormValid() -> Bool {
-        if feedbackText.trimmingCharacters(in: .whitespacesAndNewlines).count < 50 {
-            return false
-        }
-        if feedbackType == .bugReport && stepsToReproduce.trimmingCharacters(in: .whitespacesAndNewlines).count < 20 {
-            return false
-        }
-        return true
-    }
-    
     @ViewBuilder
-    private func descriptionHelperText() -> some View {
-        switch feedbackType {
-        case .bugReport:
+    private func supportCard(icon: String, iconColor: Color, title: String, description: String, buttonTitle: String, url: String) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundColor(iconColor)
+                .frame(width: 40, height: 40)
+                .background(iconColor.opacity(0.15))
+                .cornerRadius(10)
+            
             VStack(alignment: .leading, spacing: 4) {
-                Text("Please describe the issue in detail. The more actionable your feedback, the quicker our team can address your request. Some helpful information includes:")
-                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Steps to reproduce the issue") }
-                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Expected behavior") }
-                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Actual behavior") }
-                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Any error messages") }
-                HStack(alignment: .top, spacing: 4) { Text("•"); Text("Any relevant information") }
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(description)
+                    .font(.system(size: 12))
+                    .foregroundColor(ThemeColors.secondaryText)
+                    .lineLimit(2)
             }
-        case .featureRequest:
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Please describe the feature you'd like to see. The more detailed the requirements, the easier it will be for our team to incorporate your ideas. Some helpful information includes:")
-                HStack(alignment: .top, spacing: 4) { Text("•"); Text("What is missing in your workflow") }
-                HStack(alignment: .top, spacing: 4) { Text("•"); Text("What you would like to see to address this gap in your workflow") }
-                HStack(alignment: .top, spacing: 4) { Text("•"); Text("How this feature would help you and other users") }
-            }
-        case .generalFeedback:
-            Text("For any feedback that does not fit into the above categories.")
-        }
-    }
-    
-    private func descriptionPlaceholder() -> String {
-        switch feedbackType {
-        case .bugReport: return "Describe the bug you encountered..."
-        case .featureRequest: return "Describe the feature you would like to see..."
-        case .generalFeedback: return "Enter your feedback here..."
-        }
-    }
-    
-    private func sendFeedback() {
-        var body = "Type: \(feedbackType.rawValue)\n\n"
-        body += "Description:\n\(feedbackText)\n\n"
-        if feedbackType == .bugReport {
-            body += "Steps to Reproduce:\n\(stepsToReproduce)\n\n"
-        }
-        body += "Attach Logs: \(attachLogs ? "Yes" : "No")"
-        
-        if let emailURL = URL(string: "mailto:liam@no_typing.ai?subject=No-Typing%20Feedback&body=\(body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
-            NSWorkspace.shared.open(emailURL)
-        }
-    }
-}
-
-// Keeping HoverButtonStyle for compatibility if it's used elsewhere, although no longer strictly required by SupportView currently.
-struct HoverButtonStyle: ButtonStyle {
-    @State private var isHovered = false
-    
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(isHovered ? Color.blue.opacity(0.1) : Color.secondary.opacity(0.1))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.blue.opacity(isHovered ? 0.3 : 0.2), lineWidth: isHovered ? 1.5 : 1)
-            )
-            .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isHovered = hovering
+            
+            Spacer()
+            
+            SecondaryButton(title: buttonTitle) {
+                if let issueURL = URL(string: url) {
+                    NSWorkspace.shared.open(issueURL)
                 }
             }
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+        }
+        .padding(14)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 }

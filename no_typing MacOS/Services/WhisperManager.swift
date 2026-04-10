@@ -73,6 +73,18 @@ struct ModelDisplayInfo {
     let recommendation: String?  // Optional recommendation text
 }
 
+struct CustomModel: Codable, Identifiable {
+    let id: String
+    let name: String
+    let description: String
+    let tag: String
+    let downloadURL: String
+    
+    var fileName: String {
+        return URL(string: downloadURL)?.lastPathComponent ?? "\(id).bin"
+    }
+}
+
 struct WhisperModelInfo: Identifiable {
     let id: String
     let name: String
@@ -111,6 +123,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     @Published var isReady = false
     @Published var errorMessage: String?
     @Published var availableModels: [WhisperModelInfo] = []
+    @Published var customModels: [CustomModel] = []
     @Published var selectedModelSize: String = "small"  // Default model
 
     // Process management
@@ -138,6 +151,13 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
     // Add model display mapping as a static property
     private static let modelDisplayInfo: [String: ModelDisplayInfo] = [
+        "base": ModelDisplayInfo(
+            id: "base",
+            displayName: "Whisper Base",
+            icon: "waveform",
+            description: "Balanced speed and accuracy. Optimized for stable performance on all Macs.",
+            recommendation: "Best for Intel Macs"
+        ),
         "small": ModelDisplayInfo(
             id: "small",
             displayName: "Whisper Small",
@@ -185,6 +205,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     override init() {
         super.init()
         loadSelectedModel()
+        loadCustomModels()
         loadAvailableModels()
         preloadSelectedModel()
         setupNotifications()
@@ -204,27 +225,62 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         return modelDirectory
     }
 
+    // Load custom models from UserDefaults
+    private func loadCustomModels() {
+        if let data = UserDefaults.standard.data(forKey: "CustomLocalModels"),
+           let models = try? JSONDecoder().decode([CustomModel].self, from: data) {
+            self.customModels = models
+        }
+    }
+
+    // Save custom models to UserDefaults
+    private func saveCustomModels() {
+        if let data = try? JSONEncoder().encode(customModels) {
+            UserDefaults.standard.set(data, forKey: "CustomLocalModels")
+        }
+    }
+
+    // Add a custom model
+    func addCustomModel(_ model: CustomModel) {
+        customModels.append(model)
+        saveCustomModels()
+        loadAvailableModels()
+        
+        // Start downloading the newly added custom model immediately
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.downloadModel(modelSize: model.id)
+        }
+    }
+
     // Load the previously selected model from UserDefaults
     private func loadSelectedModel() {
         if let savedModel = UserDefaults.standard.string(forKey: "SelectedWhisperModel") {
+            print("📦 [WhisperManager] Loaded model selection: \(savedModel)")
             // Migration for old keys
             if savedModel == "Small" { selectedModelSize = "small" }
             else if savedModel == "largev3" { selectedModelSize = "large_v3" }
             else if savedModel == "largev3turbo" { selectedModelSize = "large_v3_turbo" }
             else { selectedModelSize = savedModel }
         } else {
-            // Default to Large V3 Turbo
-            selectedModelSize = "small"
+            // Default based on architecture
+            #if arch(arm64)
+            selectedModelSize = "small" // Default for Apple Silicon
+            #else
+            selectedModelSize = "base"  // Default for Intel (CPU)
+            #endif
+            print("📦 [WhisperManager] No saved selection found, defaulting to: \(selectedModelSize)")
+            
+            // Save this to UserDefaults immediately to avoid it being nil next time
+            UserDefaults.standard.set(selectedModelSize, forKey: "SelectedWhisperModel")
+            UserDefaults.standard.synchronize()
         }
-        
-        // Save this to UserDefaults
-        UserDefaults.standard.setValue(selectedModelSize, forKey: "SelectedWhisperModel")
     }
 
     // Load information about available Whisper models
     private func loadAvailableModels() {
-        // Include Small, large_v3, large_v3_turbo, and distil models
+        // Include Base, Small, large_v3, large_v3_turbo, and distil models
         let models = [
+            ("base", "ggml-base.bin"),
             ("small", "ggml-small.bin"),
             ("large_v3", "ggml-large-v3.bin"),
             ("large_v3_turbo", "ggml-large-v3-turbo.bin"),
@@ -233,15 +289,30 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             ("parakeet_v3", "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8")
         ]
 
+        var allModels: [(String, String, ModelDisplayInfo?)] = models.map { size, fileName in
+            (size, fileName, nil)
+        }
+        
+        for custom in customModels {
+            let info = ModelDisplayInfo(
+                id: custom.id,
+                displayName: custom.name,
+                icon: "cpu", // Generic icon for custom models
+                description: custom.description,
+                recommendation: custom.tag
+            )
+            allModels.append((custom.id, custom.fileName, info))
+        }
+
         var modelsInfo: [WhisperModelInfo] = []
         var selectedModelAvailable = false
 
-        for (size, fileName) in models {
+        for (size, fileName, customDisplayInfo) in allModels {
             // For Parakeet models, check via ParakeetManager (directory-based)
             let isAvailable: Bool
             let fileSize: UInt64
-            if ParakeetManager.isParakeetModel(size) {
-                isAvailable = ParakeetManager.shared.isModelAvailable(modelId: size)
+            if ParakeetManager.isParakeetModel(size, customFileName: fileName) {
+                isAvailable = ParakeetManager.shared.isModelAvailable(modelId: size, customFileName: fileName)
                 fileSize = 0 // Directory-based model, skip size calculation
             } else {
                 let fileURL = getModelDirectory().appendingPathComponent(fileName)
@@ -256,7 +327,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             }
 
             // Get display info from static mapping
-            let displayInfo = Self.modelDisplayInfo[size] ?? ModelDisplayInfo(
+            let displayInfo = customDisplayInfo ?? Self.modelDisplayInfo[size] ?? ModelDisplayInfo(
                 id: size,
                 displayName: "Unknown Model",
                 icon: "questionmark.circle",
@@ -287,16 +358,17 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
     // Start the setup process for a given model size
     func startSetup(modelSize: String? = nil) {
-        // Use provided model size or default to Large V3 Turbo
+        // Use provided model size or keep current
         if let size = modelSize {
             if size == "Small" { selectedModelSize = "small" }
             else if size == "largev3" { selectedModelSize = "large_v3" }
             else if size == "largev3turbo" { selectedModelSize = "large_v3_turbo" }
             else { selectedModelSize = size }
-        } else {
-            selectedModelSize = "small"
+            
+            // Only save if explicitly changed via parameter
+            UserDefaults.standard.set(selectedModelSize, forKey: "SelectedWhisperModel")
+            UserDefaults.standard.synchronize()
         }
-        UserDefaults.standard.setValue(selectedModelSize, forKey: "SelectedWhisperModel")
         
         // Update the UI state
         isReady = availableModels.first(where: { $0.id == selectedModelSize })?.isAvailable ?? false
@@ -305,35 +377,58 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         loadAvailableModels()
     }
 
+    func getModelURL(modelSize: String) -> String {
+        switch modelSize {
+        case "base", "Base":
+            return "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+        case "small", "Small":
+            return "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+        case "large_v3", "largev3":
+            return "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin"
+        case "distil_large_v3.5":
+            return "https://huggingface.co/distil-whisper/distil-large-v3.5-ggml/resolve/main/ggml-model.bin"
+        case "parakeet_v2":
+            return ParakeetManager.modelConfigs["parakeet_v2"]!.downloadURL
+        case "parakeet_v3":
+            return ParakeetManager.modelConfigs["parakeet_v3"]!.downloadURL
+        case "large_v3_turbo", "largev3turbo":
+            return "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"
+        default:
+            if let customModel = customModels.first(where: { $0.id == modelSize }) {
+                return customModel.downloadURL
+            } else {
+                return "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin" // Default fallback
+            }
+        }
+    }
+
     // Download the specified Whisper model
     func downloadModel(modelSize: String) {
         // Map model size to file name
         let fileName: String
-        let urlString: String
+        let urlString = getModelURL(modelSize: modelSize)
         
         switch modelSize {
+        case "base", "Base":
+            fileName = "ggml-base.bin"
         case "small", "Small":
             fileName = "ggml-small.bin"
-            urlString = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)"
         case "large_v3", "largev3":
             fileName = "ggml-large-v3.bin"
-            urlString = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)"
         case "distil_large_v3.5":
             fileName = "ggml-distil-large-v3.5.bin"
-            urlString = "https://huggingface.co/distil-whisper/distil-large-v3.5-ggml/resolve/main/ggml-model.bin"
         case "parakeet_v2":
-            let config = ParakeetManager.modelConfigs["parakeet_v2"]!
-            fileName = config.archiveName
-            urlString = config.downloadURL
+            fileName = ParakeetManager.modelConfigs["parakeet_v2"]!.archiveName
         case "parakeet_v3":
-            let config = ParakeetManager.modelConfigs["parakeet_v3"]!
-            fileName = config.archiveName
-            urlString = config.downloadURL
+            fileName = ParakeetManager.modelConfigs["parakeet_v3"]!.archiveName
         case "large_v3_turbo", "largev3turbo":
-            fallthrough
+            fileName = "ggml-large-v3-turbo.bin"
         default:
-            fileName = "ggml-large-v3-turbo.bin" // Default fallback
-            urlString = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)"
+            if let customModel = customModels.first(where: { $0.id == modelSize }) {
+                fileName = customModel.fileName
+            } else {
+                fileName = "ggml-large-v3-turbo.bin" // Default fallback
+            }
         }
         
         guard let url = URL(string: urlString) else { return }
@@ -389,26 +484,47 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             }
         }
         
+        print("💾 [WhisperManager] Saving model selection: \(modelSize)")
+        
         // Use the provided model size
         selectedModelSize = modelSize
-        UserDefaults.standard.setValue(selectedModelSize, forKey: "SelectedWhisperModel")
+        UserDefaults.standard.set(selectedModelSize, forKey: "SelectedWhisperModel")
+        UserDefaults.standard.synchronize() // Force write to disk
+        
         loadAvailableModels()
         preloadSelectedModel() // Preload the newly selected model
     }
 
     // Delete a downloaded Whisper model
     func deleteModel(modelSize: String) {
-        guard let modelInfo = availableModels.first(where: { $0.id == modelSize }) else { return }
+        // Remove from custom models if applicable
+        let isCustom = customModels.contains(where: { $0.id == modelSize })
+        if let index = customModels.firstIndex(where: { $0.id == modelSize }) {
+            customModels.remove(at: index)
+            saveCustomModels()
+        }
+
+        guard let modelInfo = availableModels.first(where: { $0.id == modelSize }) else { 
+            if isCustom { loadAvailableModels() }
+            return 
+        }
 
         // For Parakeet models, delete the extracted directory
         let fileURL: URL
         if ParakeetManager.isParakeetModel(modelSize) {
             fileURL = ParakeetManager.shared.modelDirectoryPath(for: modelSize)
+            // Also delete the .tar.bz2 archive to free space
+            let archiveURL = getModelDirectory().appendingPathComponent(modelInfo.fileName)
+            try? FileManager.default.removeItem(at: archiveURL)
         } else {
             fileURL = getModelDirectory().appendingPathComponent(modelInfo.fileName)
         }
+        
         do {
-            try FileManager.default.removeItem(at: fileURL)
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                try FileManager.default.removeItem(at: fileURL)
+            }
+            
             if selectedModelSize == modelSize {
                 selectedModelSize = ""
                 isReady = false
@@ -423,6 +539,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             DispatchQueue.main.async {
                 self.errorMessage = "Failed to delete model: \(error.localizedDescription)"
             }
+            loadAvailableModels() // still update UI
         }
     }
 
@@ -635,11 +752,13 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             process.standardError = outputPipe
 
             // Configure arguments based on mode - NOTE: Whisper automatically adds .txt extension to output file
+            // Auto-scale thread count: use all available cores, capped at 8
+            let threadCount = min(ProcessInfo.processInfo.activeProcessorCount, 8)
             var arguments = [
                 "-m", modelURL.path,
                 "-otxt",
                 "--no-timestamps",
-                "-t", "8",  // Use 8 threads for faster processing on Apple Silicon
+                "-t", "\(threadCount)",  // Auto-scaled for current CPU (arm64 or x86_64)
                 "-p", "1",  // Single processor for better latency
                 "-bs", "5", // Reduce beam size for faster processing (default is 5)
                 "--best-of", "1", // Reduce best-of candidates for speed
@@ -1126,13 +1245,12 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         #if arch(arm64)
         return ("arm64", ["neon", "arm64"])
         #else
-        // Only support Apple Silicon
-        fatalError("This application only supports Apple Silicon Macs")
+        return ("x86_64", ["x86_64"])
         #endif
     }
 
     private func getWhisperExecutable() -> URL? {
-        // Only support Apple Silicon executable
+        // Universal binary supporting both Apple Silicon (arm64) and Intel (x86_64)
         return Bundle.main.url(forResource: "whisper", withExtension: nil)
     }
 

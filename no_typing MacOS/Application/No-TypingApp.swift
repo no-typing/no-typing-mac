@@ -27,6 +27,87 @@ private final class InitializationManager: ObservableObject {
     }
 }
 
+// MARK: - App State Management
+
+@MainActor
+class AppContentManager: ObservableObject {
+    // Core managers for the application
+    let windowManager: WindowManager
+    
+    // macOS-specific controllers
+    #if os(macOS)
+    let statusBarController: StatusBarController
+    let hotkeyManager: GlobalHotkeyManager
+    let audioManager: AudioManager
+    #endif
+    
+    init() {
+        // 1. First, handle any first-launch/reset logic BEFORE touching any managers
+        AppContentManager.handleSetup()
+        
+        // 2. Initialize WindowManager first as other managers depend on it
+        let winManager = WindowManager()
+        self.windowManager = winManager
+        
+        // 3. Initialize macOS specific managers in order
+        #if os(macOS)
+        let audio = AudioManager()
+        let status = StatusBarController(audioManager: audio)
+        let hotkey = GlobalHotkeyManager(
+            windowManager: winManager,
+            statusBarController: status,
+            audioManager: audio
+        )
+        
+        self.audioManager = audio
+        self.statusBarController = status
+        self.hotkeyManager = hotkey
+        #endif
+    }
+    
+    private static func handleSetup() {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        print("[\(timestamp)] [AppContentManager] Checking initial application state")
+        
+        // Handle fresh install simulation
+        if UserDefaults.standard.bool(forKey: "simulateFirstLaunch") {
+            print("[\(timestamp)] [AppContentManager] 🚀 Simulating fresh install - wiping all settings")
+            let bundleId = Bundle.main.bundleIdentifier!
+            
+            // Clear UserDefaults
+            UserDefaults.standard.removePersistentDomain(forName: bundleId)
+            UserDefaults.standard.synchronize()
+            
+            // Clear application data
+            if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                let appFolder = appSupport.appendingPathComponent(bundleId)
+                try? FileManager.default.removeItem(at: appFolder)
+            }
+            
+            // Clear Keychain
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: bundleId
+            ]
+            SecItemDelete(query as CFDictionary)
+            
+            // Ensure default values for settings
+            UserDefaults.standard.set(false, forKey: "streamingModeEnabled")
+            UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+            UserDefaults.standard.set(true, forKey: "showOnboardingInDevMode")
+            
+            // Ensure the flag is disabled after the simulation runs once
+            UserDefaults.standard.set(false, forKey: "simulateFirstLaunch")
+        }
+        
+        // Standard setup that runs every time
+        if UserDefaults.standard.object(forKey: "hasCompletedOnboarding") == nil {
+            UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+        }
+    }
+}
+
+
 // Main entry point for the ThinkingAloud application
 @main
 struct ThinkingAloudApp: App {
@@ -37,111 +118,21 @@ struct ThinkingAloudApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     #endif
     
-    // Core managers for the application
-    private let windowManager: WindowManager
+    // StateObject to ensure core managers live for the entire app lifecycle
+    @StateObject private var contentManager = AppContentManager()
     
-    // macOS-specific controllers
-    #if os(macOS)
-    private let statusBarController: StatusBarController
-    private let hotkeyManager: GlobalHotkeyManager
-    private let audioManager: AudioManager
-    #endif
-
     // Development mode settings
     #if DEVELOPMENT
     @AppStorage("devModeEnabled") private var devModeEnabled = false
     @AppStorage("showOnboardingInDevMode") private var showOnboardingInDevMode = false
     #endif
 
-    // State to control onboarding display
-    @State private var showOnboarding: Bool
-    @State private var hasCreatedWindow = false
-
     // Replace the isInitialized state with a StateObject
     @StateObject private var initManager = InitializationManager()
 
     // Initialize the application and its core components
     init() {
-        log("Starting app initialization")
-        
-        // First, handle fresh install simulation before creating any managers
-        if UserDefaults.standard.bool(forKey: "simulateFirstLaunch") {
-            log("Simulating fresh install")
-            let bundleId = Bundle.main.bundleIdentifier!
-            
-            // Clear UserDefaults
-            UserDefaults.standard.removePersistentDomain(forName: bundleId)
-            UserDefaults.standard.synchronize()
-            
-            // Clear cache directory
-            if let cacheURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
-                try? FileManager.default.removeItem(at: cacheURL)
-            }
-            
-            // Clear Application Support directory
-            if let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent(bundleId) {
-                try? FileManager.default.removeItem(at: appSupportURL)
-            }
-            
-            // Clear Keychain
-            let query: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: bundleId
-            ]
-            SecItemDelete(query as CFDictionary)
-            
-            // Reset permissions state
-            UserDefaults.standard.hasCompletedOnboarding = false
-            UserDefaults.standard.removeObject(forKey: "microphonePermissionGranted")
-            UserDefaults.standard.removeObject(forKey: "accessibilityPermissionGranted")
-            
-            // Set default values for settings
-            UserDefaults.standard.set(false, forKey: "streamingModeEnabled")  // Set block mode as default
-            
-            // Ensure dev setting onboarding is shown
-            UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
-            UserDefaults.standard.set(true, forKey: "showOnboardingInDevMode")
-            
-            // Ensure the flag stays set for next launch
-            UserDefaults.standard.set(true, forKey: "simulateFirstLaunch")
-        }
-
-        log("Initializing core managers")
-        // Initialize core managers
-        let authManager = AuthenticationManager.shared
-        let windowManager = WindowManager()
-        
-        // Initialize macOS-specific components
-        #if os(macOS)
-        let audioManager = AudioManager()
-        let statusBarController = StatusBarController(
-            audioManager: audioManager
-        )
-        let hotkeyManager = GlobalHotkeyManager(
-            windowManager: windowManager,
-            statusBarController: statusBarController,
-            audioManager: audioManager
-        )
-        #endif
-
-        // Assign to stored properties
-        self.windowManager = windowManager
-        #if os(macOS)
-        self.audioManager = audioManager
-        #endif
-        
-        #if os(macOS)
-        self.statusBarController = statusBarController
-        self.hotkeyManager = hotkeyManager
-        #endif
-
-        // Initialize showOnboarding state
-        self._showOnboarding = State(initialValue: false)
-
-        // Ensure default settings are set
-        ensureDefaultSettings()
-
-        log("Initialization complete")
+        // Logging moved to Manager for better ordering
     }
     
     private func waitForInitialization() async {
@@ -150,10 +141,10 @@ struct ThinkingAloudApp: App {
         
         // Wait for audio engine to be ready
         #if os(macOS)
-        await hotkeyManager.audioManager.waitUntilReady()
+        await contentManager.audioManager.waitUntilReady()
         
         // Add a final check of the hotkey system
-        let manager = hotkeyManager // Capture the reference
+        let manager = contentManager.hotkeyManager // Capture the reference
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
             // Reset the event tap to ensure clean state after initialization
             manager.resetEventTap()
@@ -209,7 +200,7 @@ struct ThinkingAloudApp: App {
                     } else {
                         // Show ContentView
                         ContentView()
-                            .environmentObject(windowManager)
+                            .environmentObject(contentManager.windowManager)
                             .onAppear {
                                 log("ContentView appeared")
                                 requestMicrophonePermission()
@@ -222,7 +213,7 @@ struct ThinkingAloudApp: App {
                     } else {
                         // Show ContentView
                         ContentView()
-                            .environmentObject(windowManager)
+                            .environmentObject(contentManager.windowManager)
                             .onAppear {
                                 requestMicrophonePermission()
                             }
@@ -238,13 +229,6 @@ struct ThinkingAloudApp: App {
                    maxHeight: AppConfig.WindowDimensions.maxHeight)
             .onAppear {
                 log("Main window appeared")
-                // Set the initial value for showOnboarding
-                #if DEVELOPMENT
-                self.showOnboarding = UserDefaults.standard.bool(forKey: "showOnboardingInDevMode") || 
-                                      !UserDefaults.standard.hasCompletedOnboarding
-                #else
-                self.showOnboarding = !UserDefaults.standard.hasCompletedOnboarding
-                #endif
                 
                 // Start initialization process
                 Task {

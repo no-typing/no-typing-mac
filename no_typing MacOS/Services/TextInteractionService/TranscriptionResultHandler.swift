@@ -56,7 +56,8 @@ class TranscriptionResultHandler {
         
         if cleaningEnabled && TranscriptionCleaner.shared.isAvailable() && !text.isEmpty {
             do {
-                print("🧹 TranscriptionResultHandler: Cleaning streaming text...")
+                let provider = UserDefaults.standard.string(forKey: "aiRewriteProvider") ?? "Apple Intelligence"
+                print("🪄 [Handler] Requesting AI Rewrite for streaming text (Provider: \(provider))...")
                 let cleanedText = try await TranscriptionCleaner.shared.cleanTranscription(text)
                 
                 // Now translate if needed
@@ -113,7 +114,8 @@ class TranscriptionResultHandler {
         
         if cleaningEnabled && TranscriptionCleaner.shared.isAvailable() {
             do {
-                print("🧹 TranscriptionResultHandler: Cleaning accumulated text...")
+                let provider = UserDefaults.standard.string(forKey: "aiRewriteProvider") ?? "Apple Intelligence"
+                print("🪄 [Handler] Requesting AI Rewrite for accumulated text (Provider: \(provider))...")
                 let cleanedText = try await TranscriptionCleaner.shared.cleanTranscription(textToClean)
                 
                 var finalResult = cleanedText

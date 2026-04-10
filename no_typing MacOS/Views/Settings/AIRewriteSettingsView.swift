@@ -10,6 +10,7 @@ enum RewriteProvider: String, CaseIterable, Identifiable {
     case groq = "Groq"
     case deepseek = "Deepseek"
     case google = "Google"
+    case xai = "xAI Grok"
     case ollama = "Ollama"
     case custom = "Custom API endpoint"
     
@@ -33,7 +34,10 @@ struct AIRewriteSettingsView: View {
     @AppStorage("groqModel") private var groqModel: String = "llama3-70b-8192"
     @AppStorage("deepseekModel") private var deepseekModel: String = "deepseek-chat"
     @AppStorage("googleApiKey") private var googleApiKey: String = ""
-    @AppStorage("googleModel") private var googleModel: String = "gemini-2.0-flash"
+    @AppStorage("googleModel") private var googleModel: String = "gemini-3-flash-preview"
+    
+    @AppStorage("xaiApiKey") private var xaiApiKey: String = ""
+    @AppStorage("xaiModel") private var xaiModel: String = "grok-2-latest"
     
     @AppStorage("ollamaBaseURL") private var ollamaBaseURL: String = "http://localhost:11434/v1/chat/completions"
     @AppStorage("ollamaModel") private var ollamaModel: String = "llama3"
@@ -75,7 +79,11 @@ struct AIRewriteSettingsView: View {
                             .disabled(isTestRunning)
                             .onChange(of: localToggleState) { newValue in
                                 if newValue {
-                                    verifyAndEnable()
+                                    // Only verify if we are turning it ON from an OFF state
+                                    // This prevents the automatic refresh when visiting the screen
+                                    if !useAIRewrite {
+                                        verifyAndEnable()
+                                    }
                                 } else {
                                     useAIRewrite = false
                                 }
@@ -195,12 +203,20 @@ struct AIRewriteSettingsView: View {
                     ])
                 case .google:
                     providerConfigView(title: "Google Gemini API Key", icon: "sparkles.rectangle.stack.fill", color: .blue, value: $googleApiKey, placeholder: "AIza...", modelBinding: $googleModel, availableModels: [
-                        // Gemini 3.1
-                        "gemini-3.1-pro", "gemini-3.1-flash", "gemini-3.1-flash-lite",
-                        // Gemini 3
-                        "gemini-3-pro", "gemini-3-flash",
-                        // Gemini 2.5
-                        "gemini-2.5-pro", "gemini-2.5-flash"
+                        "gemini-3.1-pro-preview",
+                        "gemini-3.1-flash-lite-preview",
+                        "gemini-3-pro-preview",
+                        "gemini-3-flash-preview",
+                        "gemini-2.5-pro",
+                        "gemini-2.5-flash",
+                        "gemini-2.5-flash-lite",
+                        "gemini-2.0-flash",
+                        "gemini-2.0-flash-lite",
+                        "gemini-pro-latest"
+                    ])
+                case .xai:
+                    providerConfigView(title: "xAI API Key", icon: "xmark", color: .gray, value: $xaiApiKey, placeholder: "xai-...", modelBinding: $xaiModel, availableModels: [
+                        "grok-2-latest", "grok-2-vision-latest", "grok-beta", "grok-vision-beta"
                     ])
                 case .ollama:
                     ollamaConfigView()
@@ -210,7 +226,27 @@ struct AIRewriteSettingsView: View {
                 
                 // Test Button
                 if currentProvider != .appleIntelligence {
-                    HStack {
+                    HStack(spacing: 12) {
+                        if let url = getAPIKeyURL(for: currentProvider) {
+                            Button(action: {
+                                if let nsUrl = URL(string: url) {
+                                    NSWorkspace.shared.open(nsUrl)
+                                }
+                            }) {
+                                Text("Get Free Key")
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(Color.white.opacity(0.1))
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
                         Button(action: {
                             Task {
                                 await executeTest()
@@ -287,7 +323,7 @@ struct AIRewriteSettingsView: View {
                     .foregroundColor(.green)
                     .padding(.top, 4)
                 #else
-                Text("❌ Xcode does not support FoundationModels in this build.")
+                Text("❌ Apple Intelligence is not supported in this specific build.")
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundColor(.red)
@@ -303,6 +339,79 @@ struct AIRewriteSettingsView: View {
         }
     }
     
+    private func fetchLatestModels(for provider: LLMProvider) {
+        let key: String
+        let baseUrl: String
+        let cacheKey: String
+        
+        switch provider {
+        case .google:
+            key = googleApiKey
+            baseUrl = "" // GeminiManager handles its own URL
+            cacheKey = "google"
+        case .openai:
+            key = openAIApiKey
+            baseUrl = "" // OpenAIManager handles its own URL
+            cacheKey = "openai"
+        case .anthropic:
+            key = anthropicApiKey
+            baseUrl = ""
+            cacheKey = "anthropic"
+        case .groq:
+            key = groqApiKey
+            baseUrl = "https://api.groq.com/openai/v1/chat/completions"
+            cacheKey = "groq"
+        case .deepseek:
+            key = deepseekApiKey
+            baseUrl = "https://api.deepseek.com/chat/completions"
+            cacheKey = "deepseek"
+        case .xai:
+            key = xaiApiKey
+            baseUrl = "https://api.x.ai/v1/chat/completions"
+            cacheKey = "xai"
+        case .ollama:
+            key = ""
+            baseUrl = ollamaBaseURL
+            cacheKey = "ollama"
+        case .custom:
+            key = customApiKey
+            baseUrl = customBaseURL
+            cacheKey = "custom"
+        }
+        
+        if key.isEmpty && provider != .ollama && provider != .custom {
+            testStatus = "Please enter an API key first."
+            return
+        }
+        
+        Task {
+            do {
+                let fetched: [String]
+                switch provider {
+                case .google:
+                    fetched = try await GeminiManager.shared.fetchAvailableModels(apiKey: key)
+                case .openai:
+                    fetched = try await OpenAIManager.shared.fetchAvailableModels(apiKey: key)
+                case .anthropic:
+                    fetched = try await AnthropicManager.shared.fetchAvailableModels(apiKey: key)
+                default:
+                    fetched = try await ExtendedLLMManager.shared.fetchAvailableModels(apiKey: key, baseURL: baseUrl, provider: provider)
+                }
+                
+                DispatchQueue.main.async {
+                    ModelCacheManager.shared.saveModels(fetched, for: cacheKey)
+                    testStatus = "Fetched \(fetched.count) models for \(provider.rawValue)"
+                    isTestSuccessful = true
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    testStatus = "Fetch failed: \(error.localizedDescription)"
+                    isTestSuccessful = false
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private func ollamaConfigView() -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -345,13 +454,63 @@ struct AIRewriteSettingsView: View {
             HStack {
                 Text("Model:")
                     .foregroundColor(.white.opacity(0.8))
+                
+                let cacheKey: String = {
+                    if title.contains("Google") { return "google" }
+                    if title.contains("OpenAI") { return "openai" }
+                    if title.contains("Anthropic") { return "anthropic" }
+                    if title.contains("Groq") { return "groq" }
+                    if title.contains("Deepseek") { return "deepseek" }
+                    if title.contains("xAI") { return "xai" }
+                    return title.lowercased()
+                }()
+                
+                let provider: LLMProvider = {
+                    if title.contains("Google") { return .google }
+                    if title.contains("OpenAI") { return .openai }
+                    if title.contains("Anthropic") { return .anthropic } 
+                    if title.contains("Groq") { return .groq }
+                    if title.contains("Deepseek") { return .deepseek }
+                    if title.contains("xAI") { return .xai }
+                    return .custom
+                }()
+
+                let combinedModels = ModelCacheManager.shared.mergeModels(
+                    predefined: availableModels,
+                    fetched: ModelCacheManager.shared.getModels(for: cacheKey)
+                )
+
                 Picker("", selection: modelBinding) {
-                    ForEach(availableModels, id: \.self) { model in
+                    ForEach(combinedModels, id: \.self) { model in
                         Text(model).tag(model)
                     }
                 }
                 .pickerStyle(MenuPickerStyle())
                 .frame(width: 200)
+
+                Button(action: {
+                    // Specific mapping for Anthropic because it's not in LLMProvider but used in providerConfigView
+                    if title.contains("Anthropic") {
+                        Task {
+                            do {
+                                let fetched = try await AnthropicManager.shared.fetchAvailableModels(apiKey: anthropicApiKey)
+                                ModelCacheManager.shared.saveModels(fetched, for: "anthropic")
+                                testStatus = "Fetched \(fetched.count) Anthropic models"
+                                isTestSuccessful = true
+                            } catch {
+                                testStatus = "Fetch failed: \(error.localizedDescription)"
+                            }
+                        }
+                    } else {
+                        fetchLatestModels(for: provider)
+                    }
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 14))
+                        .foregroundColor(color)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("Refresh model list")
             }
         }
     }
@@ -443,7 +602,7 @@ struct AIRewriteSettingsView: View {
                 _ = try await AnthropicManager.shared.improveText(prompt: "Respond 'OK'", text: "Ping", model: anthropicModel)
                 valid = true
                 statusText = "Anthropic verified!"
-            case .groq, .deepseek, .ollama, .custom:
+            case .groq, .deepseek, .xai, .ollama, .custom:
                 let extProvider: LLMProvider
                 let key: String
                 let url: String
@@ -460,6 +619,11 @@ struct AIRewriteSettingsView: View {
                     key = deepseekApiKey
                     url = "https://api.deepseek.com/chat/completions"
                     modelUsed = deepseekModel
+                case .xai:
+                    extProvider = .xai
+                    key = xaiApiKey
+                    url = "https://api.x.ai/v1/chat/completions"
+                    modelUsed = xaiModel
                 case .ollama:
                     extProvider = .ollama
                     key = ""
@@ -474,7 +638,7 @@ struct AIRewriteSettingsView: View {
                     throw NSError(domain: "Invalid map", code: -1)
                 }
                 
-                if (extProvider == .groq || extProvider == .deepseek) && key.isEmpty {
+                if (extProvider == .groq || extProvider == .deepseek || extProvider == .xai) && key.isEmpty {
                     throw NSError(domain: "Missing API Key", code: -1)
                 }
                 
@@ -483,8 +647,7 @@ struct AIRewriteSettingsView: View {
                 statusText = "\(currentProvider.rawValue) verified!"
             case .google:
                 if googleApiKey.isEmpty { throw NSError(domain: "Missing Key", code: -1) }
-                let url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-                _ = try await ExtendedLLMManager.shared.improveText(prompt: "Respond 'OK'", text: "Ping", provider: .google, apiKey: googleApiKey, baseURL: url, model: googleModel)
+                _ = try await GeminiManager.shared.improveText(systemPrompt: "Respond 'OK'", userText: "Ping", apiKey: googleApiKey, model: googleModel)
                 valid = true
                 statusText = "Google Gemini verified!"
             }
@@ -502,6 +665,19 @@ struct AIRewriteSettingsView: View {
                 self.isTestRunning = false
             }
             return false
+        }
+    }
+    
+    private func getAPIKeyURL(for provider: RewriteProvider) -> String? {
+        switch provider {
+        case .appleIntelligence: return nil
+        case .openai: return "https://platform.openai.com/api-keys"
+        case .anthropic: return "https://console.anthropic.com/settings/keys"
+        case .groq: return "https://console.groq.com/keys"
+        case .deepseek: return "https://platform.deepseek.com/api_keys"
+        case .google: return "https://aistudio.google.com/app/apikey"
+        case .xai: return "https://console.x.ai/team/api-keys"
+        case .ollama, .custom: return nil
         }
     }
 }

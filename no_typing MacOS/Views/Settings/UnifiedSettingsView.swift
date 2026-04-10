@@ -20,6 +20,11 @@ struct UnifiedSettingsView: View {
     @AppStorage("cloudGroqModel") private var cloudGroqModel: String = "whisper-large-v3-turbo"
     @AppStorage("cloudCustomModel") private var cloudCustomModel: String = "whisper-1"
     
+    #if DEVELOPMENT
+    @AppStorage("simulateFirstLaunch") private var simulateFirstLaunch = false
+    #endif
+
+    
     enum SettingsSection: String, CaseIterable {
         case recentActivity = "Activity"
         case modelSettings = "Models"
@@ -511,6 +516,45 @@ struct UnifiedSettingsView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.large)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(8)
+            
+            // Persistence Settings
+            VStack(alignment: .leading, spacing: 16) {
+                Text("System Persistence")
+                    .font(.headline)
+                    .foregroundColor(.white)
+
+
+                VStack(alignment: .leading, spacing: 8) {
+                    SettingsToggleRow(
+                        icon: "gamecontroller",
+                        title: "Simulate First Launch",
+                        isOn: $simulateFirstLaunch,
+                        iconGradient: LinearGradient(colors: [.gray, .black.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                    
+                    Text("Wipes all settings and cache on the next app restart.")
+                        .font(.subheadline)
+                        .foregroundColor(ThemeColors.secondaryText)
+                        .padding(.leading, 12)
+                }
+                
+                if simulateFirstLaunch {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text("Active: App will reset on next launch")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.orange)
+                    }
+                    .padding(.top, 4)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
             .background(Color.secondary.opacity(0.1))
             .cornerRadius(8)

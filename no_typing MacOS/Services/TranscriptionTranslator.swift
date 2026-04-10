@@ -30,7 +30,13 @@ class TranscriptionTranslator {
             let model = UserDefaults.standard.string(forKey: "anthropicTranslationModel") ?? "claude-3-5-sonnet-latest"
             return try await AnthropicManager.shared.improveText(prompt: prompt, text: text, model: model)
             
-        case "Groq", "Deepseek", "Ollama", "Custom API endpoint", "Google":
+        case "Google":
+            let key = UserDefaults.standard.string(forKey: "googleApiKey") ?? ""
+            let modelUsed = UserDefaults.standard.string(forKey: "googleTranslationModel") ?? "gemini-3.1-flash-preview"
+            if key.isEmpty { return text }
+            return try await GeminiManager.shared.improveText(systemPrompt: prompt, userText: text, apiKey: key, model: modelUsed)
+            
+        case "Groq", "Deepseek", "Ollama", "Custom API endpoint":
             let extProvider: LLMProvider
             let key: String
             let url: String
@@ -47,11 +53,7 @@ class TranscriptionTranslator {
                 key = UserDefaults.standard.string(forKey: "deepseekApiKey") ?? ""
                 url = "https://api.deepseek.com/chat/completions"
                 modelUsed = UserDefaults.standard.string(forKey: "deepseekTranslationModel") ?? "deepseek-chat"
-            case "Google":
-                extProvider = .google
-                key = UserDefaults.standard.string(forKey: "googleApiKey") ?? ""
-                url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-                modelUsed = UserDefaults.standard.string(forKey: "googleTranslationModel") ?? "gemini-2.0-flash"
+
             case "Ollama":
                 extProvider = .ollama
                 key = ""

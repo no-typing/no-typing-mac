@@ -47,15 +47,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStandardUserDriverDelegate {
     var updaterController: SPUStandardUpdaterController!
     private var isCheckingForUpdates = false
-
+    
     // Add these properties for handling text overlay
     private var hudController: HUDMainController?
     private var textOverlayController: SelectedTextOverlayController?
     
-    // Properties for window management
-    private var onboardingWindow: NSWindow?
-    private var onboardingWindowController: NSWindowController?
-
+    // Properties for window management removed (managed by StatusBarController)
+    
+    
     // Add these at the top of your AppDelegate class
     private let logFile: URL = {
         let appSupportPath = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -66,7 +65,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         
         return appSupportDir.appendingPathComponent("sparkle_update.log")
     }()
-
+    
     // Add managers
     @MainActor private var windowManager: WindowManager!
     
@@ -78,7 +77,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             self.windowManager = WindowManager()
         }
     }
-
+    
     private func logToFile(_ message: String) {
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let logMessage = "[\(timestamp)] \(message)\n"
@@ -97,7 +96,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             print("Failed to write to log file: \(error)")
         }
     }
-
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("🚀 Starting application initialization...")
         
@@ -114,10 +113,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         
         // Check if this is the first launch and handle onboarding
         if !UserDefaults.standard.hasCompletedOnboarding {
-            // For first-time users, show settings window to complete setup
+            // For first-time users, show settings window (StatusBarController will show correct view)
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
-                self.showOnboardingSettings()
+                NotificationCenter.default.post(name: .showSettingsWindow, object: nil)
             }
         } else {
             // For returning users, show the settings window automatically on launch
@@ -151,7 +150,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             name: .showSelectedTextOverlay,
             object: nil
         )
-
+        
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleDismissSelectedTextOverlay(_:)),
@@ -161,7 +160,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         
         
     }
-
+    
     // MARK: - Sparkle Initialization
     private func initializeSparkleUpdater() {
         print("📦 Initializing Sparkle updater...")
@@ -258,11 +257,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             }
         }
     }
-
+    
     func applicationWillTerminate(_ aNotification: Notification) {
         // Cleanup if needed
     }
-
+    
     func application(_ application: NSApplication, open urls: [URL]) {
         if let url = urls.first {
             switch url.scheme {
@@ -283,9 +282,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             }
         }
     }
-
-
-
+    
+    
+    
     func requestMicrophonePermission() {
         switch AVCaptureDevice.authorizationStatus(for: AVMediaType.audio) {
         case .authorized:
@@ -302,30 +301,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             // Inform the user that microphone access is required
         }
     }
-
-
+    
+    
     func applicationDidBecomeActive(_ notification: Notification) {
         // App became active - no special processing needed currently
     }
-
+    
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // If the user clicks the dock icon, show the settings window
         NotificationCenter.default.post(name: .showSettingsWindow, object: nil)
         return true
     }
-
+    
     func applicationWillResignActive(_ notification: Notification) {
         // Post notification for other components to respond to
         NotificationCenter.default.post(name: .appWillResignActive, object: nil)
     }
-
+    
     // Add this new method to handle window configuration
     private func configureWindow(_ window: NSWindow) {
         // Check for Sparkle windows by class name or title
-        if window.className.contains("Sparkle") || 
-           window.title.contains("Update") ||
-           window.title.contains("Software Update") ||
-           window.title.contains("Updating No-Typing") {
+        if window.className.contains("Sparkle") ||
+            window.title.contains("Update") ||
+            window.title.contains("Software Update") ||
+            window.title.contains("Updating No-Typing") {
             window.backgroundColor = NSColor.black.withAlphaComponent(0.8)
             window.isOpaque = false
             window.titlebarAppearsTransparent = true
@@ -366,7 +365,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             window.standardWindowButton(buttonType)?.wantsLayer = true
         }
     }
-
+    
     // Add this method to handle new windows
     func applicationDidUpdate(_ notification: Notification) {
         NSApplication.shared.windows.forEach { window in
@@ -376,7 +375,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             }
         }
     }
-
+    
     // MARK: - SPUUpdaterDelegate Methods
     
     func updater(_ updater: SPUUpdater, didFinishLoading appcast: SUAppcast) {
@@ -440,7 +439,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         }
         task.resume()
     }
-
+    
     private func checkAppcastContent(url: URL) {
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
             if let error = error {
@@ -459,7 +458,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         }
         task.resume()
     }
-
+    
     // Add these methods at the bottom of your AppDelegate class
     
     func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
@@ -501,14 +500,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         """
         logToFile(errorMessage)
     }
-
+    
     // Add this new delegate method
     func updater(_ updater: SPUUpdater, willShowModalAlert alert: NSAlert) {
         let window = alert.window
         window.backgroundColor = .windowBackgroundColor
         window.isOpaque = true
     }
-
+    
     // Add this delegate method to handle background check results
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         logToFile("📦 Valid update found: \(item.displayVersionString)")
@@ -519,7 +518,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         //     self.updaterController.checkForUpdates(nil)
         // }
     }
-
+    
     // Fix the validation method to use the correct property names
     func updater(_ updater: SPUUpdater, validateUpdate item: SUAppcastItem) throws {
         logToFile("🔍 Validating update: \(item.displayVersionString)")
@@ -549,7 +548,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             print("📊 Expected size: \(expectedLength) bytes")
         }
     }
-
+    
     // Add this new method
     private func checkForUpdatesIfNeeded() {
         guard !isCheckingForUpdates,
@@ -566,7 +565,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
             // self?.updaterController.updater.checkForUpdatesInBackground()
         }
     }
-
+    
     // Add new delegate methods for better error handling
     func updater(_ updater: SPUUpdater, shouldDownloadReleaseNotes items: [SUAppcastItem]) -> Bool {
         // Allow release notes download
@@ -592,7 +591,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         """
         logToFile(message)
     }
-
+    
     // Add this new method to handle text overlay notifications
     @objc private func handleShowSelectedTextOverlay(_ notification: Notification) {
         print("📱 AppDelegate: handleShowSelectedTextOverlay called")
@@ -607,7 +606,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         
         print("📱 AppDelegate: Selected text: \(selectedText.prefix(20))...")
     }
-
+    
     @objc private func handleDismissSelectedTextOverlay(_ notification: Notification) {
         print("📱 AppDelegate: handleDismissSelectedTextOverlay called")
         
@@ -618,84 +617,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
         textOverlayController?.hideAnimated()
         textOverlayController = nil
     }
-    
-    @MainActor
-    private func showOnboardingSettings() {
-        // Check if onboarding window already exists
-        if let existingWindow = onboardingWindow {
-            // Window exists, bring it to front
-            existingWindow.makeKeyAndOrderFront(nil)
-            
-            // Show in dock
-            NSApp.setActivationPolicy(.regular)
-            
-            NSApp.activate(ignoringOtherApps: true)
-            
-            // If window is minimized, deminiaturize it
-            if existingWindow.isMiniaturized {
-                existingWindow.deminiaturize(nil)
-            }
-            
-            // Ensure window is visible
-            if !existingWindow.isVisible {
-                existingWindow.orderFront(nil)
-            }
-            
-            return
-        }
-        
-        // Create a temporary audio manager for onboarding
-        let audioManager = AudioManager()
-        
-        let contentView = OnboardingView()
-            .environmentObject(WindowManager())
-            .environmentObject(audioManager)
-        
-        let hostingController = NSHostingController(rootView: contentView)
-        let window = NSWindow(contentViewController: hostingController)
-        window.title = "Welcome to No-Typing"
-        window.setContentSize(NSSize(width: 529, height: 756))
-        window.minSize = NSSize(width: 397, height: 504)
-        window.center()
-        
-        // Configure window style
-        window.backgroundColor = NSColor.windowBackgroundColor
-        window.titlebarAppearsTransparent = false
-        window.titleVisibility = .visible
-        
-        // Use normal window level so it behaves like a regular app window
-        window.level = .normal
-        
-        // Set delegate to handle window closing
-        window.delegate = self
-        
-        // Store reference to the window
-        onboardingWindow = window
-        
-        // Create window controller to keep window alive
-        let windowController = NSWindowController(window: window)
-        onboardingWindowController = windowController
-        
-        // Show in dock
-        NSApp.setActivationPolicy(.regular)
-        
-        windowController.showWindow(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
 }
-
 // MARK: - NSWindowDelegate
 extension AppDelegate: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
-        // Clear the window reference when it closes
-        if notification.object as? NSWindow === onboardingWindow {
-            onboardingWindow = nil
-            onboardingWindowController = nil
-            
-            // Hide from dock
-            NSApp.setActivationPolicy(.accessory)
-        }
+        // Window close handling
     }
     
     func windowShouldClose(_ sender: NSWindow) -> Bool {

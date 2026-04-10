@@ -3,6 +3,14 @@ import SwiftUI
 struct ExtendedLLMSettingsView: View {
     @AppStorage("extendedLLMProvider") private var selectedProvider: String = LLMProvider.groq.rawValue
     
+    // OpenAI
+    @AppStorage("openaiApiKey") private var openAIApiKey: String = ""
+    @AppStorage("openaiModelSelection") private var openaiModel: String = "gpt-4o"
+    
+    // Anthropic
+    @AppStorage("anthropicApiKey") private var anthropicApiKey: String = ""
+    @AppStorage("anthropicModelSelection") private var anthropicModel: String = "claude-3-5-sonnet-latest"
+    
     // Groq
     @AppStorage("groqApiKey") private var groqApiKey: String = ""
     @AppStorage("groqModel") private var groqModel: String = "llama3-70b-8192"
@@ -10,6 +18,10 @@ struct ExtendedLLMSettingsView: View {
     // Deepseek
     @AppStorage("deepseekApiKey") private var deepseekApiKey: String = ""
     @AppStorage("deepseekModel") private var deepseekModel: String = "deepseek-chat"
+    
+    // xAI
+    @AppStorage("xaiApiKey") private var xaiApiKey: String = ""
+    @AppStorage("xaiModel") private var xaiModel: String = "grok-2-latest"
     
     // Ollama
     @AppStorage("ollamaBaseURL") private var ollamaBaseURL: String = "http://localhost:11434/v1/chat/completions"
@@ -49,6 +61,8 @@ struct ExtendedLLMSettingsView: View {
                 buildGroqUI()
             } else if selectedProvider == LLMProvider.deepseek.rawValue {
                 buildDeepseekUI()
+            } else if selectedProvider == LLMProvider.xai.rawValue {
+                buildXaiUI()
             } else if selectedProvider == LLMProvider.ollama.rawValue {
                 buildOllamaUI()
             } else {
@@ -112,6 +126,29 @@ struct ExtendedLLMSettingsView: View {
                 
                 Spacer()
                 testButton(apiKey: deepseekApiKey)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func buildXaiUI() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SecureField("xAI API Key", text: $xaiApiKey)
+                .textFieldStyle(PlainTextFieldStyle())
+                .padding()
+                .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                .cornerRadius(8)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            
+            HStack {
+                Text("Model:")
+                    .foregroundColor(.white.opacity(0.8))
+                TextField("E.g. grok-2-latest", text: $xaiModel)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .frame(width: 200)
+                
+                Spacer()
+                testButton(apiKey: xaiApiKey)
             }
         }
     }
@@ -208,14 +245,82 @@ struct ExtendedLLMSettingsView: View {
             key = deepseekApiKey
             url = "https://api.deepseek.com/chat/completions"
             modelStr = deepseekModel
+        case .xai:
+            key = xaiApiKey
+            url = "https://api.x.ai/v1/chat/completions"
+            modelStr = xaiModel
         case .ollama:
             key = ""
             url = ollamaBaseURL
             modelStr = ollamaModel
         case .google:
             key = UserDefaults.standard.string(forKey: "googleApiKey") ?? ""
-            url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-            modelStr = UserDefaults.standard.string(forKey: "googleModel") ?? "gemini-2.0-flash"
+            modelStr = UserDefaults.standard.string(forKey: "googleModel") ?? "gemini-3.1-flash-preview"
+            
+            Task {
+                do {
+                    _ = try await GeminiManager.shared.improveText(
+                        systemPrompt: "You are a helpful assistant. Respond exactly with 'OK'.",
+                        userText: "Ping",
+                        apiKey: key,
+                        model: modelStr
+                    )
+                    DispatchQueue.main.async {
+                        self.isTestSuccessful = true
+                        self.testStatus = "Connection successful!"
+                        self.isTestRunning = false
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.isTestSuccessful = false
+                        self.testStatus = error.localizedDescription
+                        self.isTestRunning = false
+                    }
+                }
+            }
+            return
+        case .openai:
+            key = openAIApiKey
+            url = ""
+            modelStr = openaiModel
+            Task {
+                do {
+                    _ = try await OpenAIManager.shared.improveText(prompt: "Respond 'OK'", text: "Ping", model: modelStr)
+                    DispatchQueue.main.async {
+                        self.isTestSuccessful = true
+                        self.testStatus = "Connection successful!"
+                        self.isTestRunning = false
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.isTestSuccessful = false
+                        self.testStatus = error.localizedDescription
+                        self.isTestRunning = false
+                    }
+                }
+            }
+            return
+        case .anthropic:
+            key = anthropicApiKey
+            url = ""
+            modelStr = anthropicModel
+            Task {
+                do {
+                    _ = try await AnthropicManager.shared.improveText(prompt: "Respond 'OK'", text: "Ping", model: modelStr)
+                    DispatchQueue.main.async {
+                        self.isTestSuccessful = true
+                        self.testStatus = "Connection successful!"
+                        self.isTestRunning = false
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.isTestSuccessful = false
+                        self.testStatus = error.localizedDescription
+                        self.isTestRunning = false
+                    }
+                }
+            }
+            return
         case .custom:
             key = customApiKey
             url = customBaseURL

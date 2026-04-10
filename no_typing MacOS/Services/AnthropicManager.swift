@@ -94,4 +94,32 @@ class AnthropicManager {
         
         throw AnthropicError.decodingError
     }
+    
+    /// Fetch current available models from Anthropic
+    func fetchAvailableModels(apiKey: String) async throws -> [String] {
+        guard let url = URL(string: "https://api.anthropic.com/v1/models") else {
+            throw AnthropicError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.addValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw AnthropicError.invalidResponse
+        }
+        
+        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let models = json["data"] as? [[String: Any]] {
+            return models.compactMap { dict -> String? in
+                guard let id = dict["id"] as? String else { return nil }
+                return id
+            }
+        }
+        
+        throw AnthropicError.decodingError
+    }
 }

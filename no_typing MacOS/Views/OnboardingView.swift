@@ -324,35 +324,35 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
-                // Model information - simplified to show only Medium model
+                // Model information - dynamically show the recommended model
                 VStack(alignment: .leading, spacing: 20) {
-                    // Show information about the Medium model
-                    if let mediumModel = whisperManager.availableModels.first {
+                    // Show information about the recommended model
+                    if let recommendedModel = whisperManager.availableModels.first(where: { $0.id == whisperManager.selectedModelSize }) {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 Image(systemName: "globe")
                                     .font(.system(size: 18))
                                     .foregroundColor(.blue)
                                 
-                                Text("Multilingual Mode")
+                                Text("\(recommendedModel.displayInfo.displayName) (\(recommendedModel.displayInfo.recommendation ?? "Recommended"))")
                                     .font(.headline)
                             }
                             
-                            Text(mediumModel.description)
+                            Text(recommendedModel.displayInfo.description)
                                 .font(.body)
                                 .foregroundColor(.secondary)
                             
                             // Show download button if not already downloaded
-                            if !mediumModel.isAvailable && !whisperManager.isDownloading {
+                            if !recommendedModel.isAvailable && !whisperManager.isDownloading {
                                 Button(action: {
-                                    whisperManager.downloadModel(modelSize: "Medium")
+                                    whisperManager.downloadModel(modelSize: recommendedModel.id)
                                 }) {
                                     Label("Download Model", systemImage: "arrow.down.circle")
                                 }
                                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                                 .padding(.top, 8)
-                            } else if mediumModel.isAvailable {
+                            } else if recommendedModel.isAvailable {
                                 HStack {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(.green)
@@ -1423,8 +1423,9 @@ struct OnboardingView: View {
 
     /// Checks if a model is selected and downloading/downloaded
     func isModelSelectedAndReady() -> Bool {
-        // Check if the Medium model is downloaded and available or currently downloading
-        return whisperManager.availableModels.first?.isAvailable ?? false || whisperManager.isDownloading
+        // Check if the recommended model is downloaded and available or currently downloading
+        let recommendedModel = whisperManager.availableModels.first(where: { $0.id == whisperManager.selectedModelSize })
+        return recommendedModel?.isAvailable ?? false || whisperManager.isDownloading
     }
 
     /// Checks the current permission statuses

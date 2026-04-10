@@ -12,17 +12,13 @@ class TranscriptionCleaner {
     
     /// Clean up transcribed text by removing filler words and making it concise
     func cleanTranscription(_ rawText: String) async throws -> String {
-        #if canImport(FoundationModels)
-        // Check for macOS 26.0+ availability at runtime
-        guard #available(macOS 26.0, *) else {
-            return rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        
         // Skip cleaning if text is empty or very short
         let trimmedText = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedText.isEmpty || trimmedText.count < 3 {
             return trimmedText
         }
+
+        print("Cleaning transcription: \(rawText)")
         
         // Get the selected language from UserDefaults
         let selectedLanguageCode = UserDefaults.standard.string(forKey: "selectedLanguage") ?? "auto"
@@ -173,6 +169,9 @@ class TranscriptionCleaner {
             
             let response: String
             
+            print("✨ [AI Rewrite] Starting rewrite using: \(rewriteProviderString)")
+            print("📝 [AI Rewrite] Input: \"\(rawText)\"")
+            
             switch rewriteProviderString {
             case "OpenAI":
                 if openAIApiKey.isEmpty { return trimmedText }
@@ -219,32 +218,35 @@ class TranscriptionCleaner {
                 
             case "Google":
                 let googleApiKey = UserDefaults.standard.string(forKey: "googleApiKey") ?? ""
-                let googleModel = UserDefaults.standard.string(forKey: "googleModel") ?? "gemini-2.0-flash"
+                let googleModel = UserDefaults.standard.string(forKey: "googleModel") ?? "gemini-3.1-flash-preview"
                 if googleApiKey.isEmpty { return trimmedText }
-                let url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-                response = try await ExtendedLLMManager.shared.improveText(prompt: prompt, text: rawText, provider: .google, apiKey: googleApiKey, baseURL: url, model: googleModel)
+                response = try await GeminiManager.shared.improveText(systemPrompt: prompt, userText: rawText, apiKey: googleApiKey, model: googleModel)
                 
             default: // Apple Intelligence
-                if #available(macOS 26.0, *) {
-                    let session = LanguageModelSession()
-                    let result = try await session.respond(to: prompt)
-                    response = result.content
-                } else {
+                #if canImport(FoundationModels)
+                    if #available(macOS 15.1, *) {
+                        let session = LanguageModelSession()
+                        let result = try await session.respond(to: prompt)
+                        response = result.content
+                    } else {
+                        return trimmedText
+                    }
+                #else
                     return trimmedText
-                }
+                #endif
             }
             
             let cleanedText = response.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            print("✅ [AI Rewrite] Completed! Provider: \(rewriteProviderString)")
+            print("📤 [AI Rewrite] Output: \"\(cleanedText)\"")
+            
             return cleanedText.isEmpty ? trimmedText : cleanedText
         } catch {
             print("⚠️ TranscriptionCleaner: Failed to clean text - \(error.localizedDescription)")
             // Return original text if cleaning fails
             return trimmedText
         }
-        #else
-        // If FoundationModels is not available, return original text
-        return rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        #endif
     }
     
     /// Check if the cleaning service should be considered available

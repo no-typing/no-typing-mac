@@ -153,7 +153,7 @@ struct SettingsToggleRow: View {
                 .foregroundColor(.white)
             Spacer()
             Toggle("", isOn: $isOn)
-                .toggleStyle(SwitchToggleStyle(tint: .white))
+                .toggleStyle(.switch)
                 .labelsHidden()
         }
         .padding(.vertical, 8)

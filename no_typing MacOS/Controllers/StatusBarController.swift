@@ -128,14 +128,38 @@ class StatusBarController: NSObject, ObservableObject {
         
         // Create new window only if it doesn't exist
         let windowManager = WindowManager()
-        let contentView = ContentView()
-            .environmentObject(windowManager)
-            .environmentObject(self.audioManager)
-        let hostingController = NSHostingController(rootView: contentView)
+        
+        // Define a reactive wrapper view to handle internal navigation between Onboarding and Settings
+        struct MainAppWindowView: View {
+            @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding = false
+            let windowManager: WindowManager
+            let audioManager: AudioManager
+            
+            var body: some View {
+                if hasCompletedOnboarding {
+                    ContentView()
+                        .environmentObject(windowManager)
+                        .environmentObject(audioManager)
+                } else {
+                    OnboardingView()
+                        .environmentObject(windowManager)
+                        .environmentObject(audioManager)
+                }
+            }
+        }
+        
+        let rootView = MainAppWindowView(
+            windowManager: windowManager,
+            audioManager: self.audioManager
+        )
+        
+        let hostingController = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingController)
         window.title = ""
-        window.setContentSize(NSSize(width: 1000, height: 700))
-        window.minSize = NSSize(width: 800, height: 500)
+        window.setContentSize(NSSize(width: AppConfig.WindowDimensions.initialWidth, 
+                                   height: AppConfig.WindowDimensions.initialHeight))
+        window.minSize = NSSize(width: AppConfig.WindowDimensions.minWidth, 
+                              height: AppConfig.WindowDimensions.minHeight)
         window.center()
         
         // Configure window style

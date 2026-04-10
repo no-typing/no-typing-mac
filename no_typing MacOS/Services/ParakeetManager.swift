@@ -47,8 +47,14 @@ class ParakeetManager {
     ]
     
     /// Returns whether the given model ID is a Parakeet model
-    static func isParakeetModel(_ modelId: String) -> Bool {
-        return modelId.hasPrefix("parakeet_")
+    static func isParakeetModel(_ modelId: String, customFileName: String? = nil) -> Bool {
+        if modelId.hasPrefix("parakeet_") { return true }
+        if let fn = customFileName { return fn.hasSuffix(".tar.bz2") }
+        // Fallback (may crash if WhisperManager is uninitialized)
+        if let custom = WhisperManager.shared.customModels.first(where: { $0.id == modelId }) {
+            return custom.fileName.hasSuffix(".tar.bz2")
+        }
+        return false
     }
     
     /// Returns the model directory root in Application Support
@@ -59,26 +65,29 @@ class ParakeetManager {
     }
     
     /// Returns the extracted model directory for a given model ID
-    func modelDirectoryPath(for modelId: String) -> URL {
-        guard let config = Self.modelConfigs[modelId] else {
-            return getModelDirectory().appendingPathComponent("parakeet-unknown")
+    func modelDirectoryPath(for modelId: String, customFileName: String? = nil) -> URL {
+        if let config = Self.modelConfigs[modelId] {
+            return getModelDirectory().appendingPathComponent(config.directoryName)
         }
-        return getModelDirectory().appendingPathComponent(config.directoryName)
+        
+        let resolveFileName: String? = customFileName ?? WhisperManager.shared.customModels.first(where: { $0.id == modelId })?.fileName
+        
+        if let fileName = resolveFileName, fileName.hasSuffix(".tar.bz2") {
+             let directoryName = String(fileName.dropLast(8))
+             return getModelDirectory().appendingPathComponent(directoryName)
+        }
+        return getModelDirectory().appendingPathComponent("parakeet-unknown")
     }
     
     /// Check if model is available locally (extracted directory with required files)
-    func isModelAvailable(modelId: String) -> Bool {
-        let modelDir = modelDirectoryPath(for: modelId)
-        let encoder = modelDir.appendingPathComponent("encoder.int8.onnx")
-        let decoder = modelDir.appendingPathComponent("decoder.int8.onnx")
-        let joiner = modelDir.appendingPathComponent("joiner.int8.onnx")
-        let tokens = modelDir.appendingPathComponent("tokens.txt")
-        
+    func isModelAvailable(modelId: String, customFileName: String? = nil) -> Bool {
+        let modelDir = modelDirectoryPath(for: modelId, customFileName: customFileName)
         let fm = FileManager.default
-        return fm.fileExists(atPath: encoder.path) &&
-               fm.fileExists(atPath: decoder.path) &&
-               fm.fileExists(atPath: joiner.path) &&
-               fm.fileExists(atPath: tokens.path)
+        let items = (try? fm.contentsOfDirectory(atPath: modelDir.path)) ?? []
+        let hasTokens = items.contains(where: { $0.hasSuffix("tokens.txt") })
+        guard hasTokens else { return false }
+        
+        return items.contains(where: { $0.hasSuffix(".onnx") })
     }
     
     /// Check if sherpa-onnx-offline binary is available in the bundle
@@ -108,12 +117,20 @@ class ParakeetManager {
     
     /// Extract a downloaded tar.bz2 archive to the model directory
     func extractModelArchive(archivePath: URL, modelId: String) throws {
-        guard let config = Self.modelConfigs[modelId] else {
-            throw ParakeetError.extractionFailed("Unknown model ID: \(modelId)")
+        let directoryName: String
+        if let config = Self.modelConfigs[modelId] {
+            directoryName = config.directoryName
+        } else {
+            let fileName = archivePath.lastPathComponent
+            if fileName.hasSuffix(".tar.bz2") {
+                directoryName = String(fileName.dropLast(8))
+            } else {
+                throw ParakeetError.extractionFailed("Custom model archive must be a .tar.bz2 file.")
+            }
         }
         
         let destinationDir = getModelDirectory()
-        let extractedDir = destinationDir.appendingPathComponent(config.directoryName)
+        let extractedDir = destinationDir.appendingPathComponent(directoryName)
         
         // Remove existing extracted directory if present
         if FileManager.default.fileExists(atPath: extractedDir.path) {
@@ -140,7 +157,7 @@ class ParakeetManager {
         
         // Verify extraction produced the expected files
         guard isModelAvailable(modelId: modelId) else {
-            throw ParakeetError.extractionFailed("Expected model files not found after extraction in \(config.directoryName)")
+            throw ParakeetError.extractionFailed("Expected model files not found after extraction in \(directoryName)")
         }
         
         // Clean up the archive file
@@ -174,17 +191,11 @@ class ParakeetManager {
     
     private func runSherpaOnnxOnChunks(chunkURLs: [URL], modelId: String, sherpaURL: URL, completion: @escaping (Result<[WhisperTranscriptionSegment], Error>) -> Void) {
         let modelDir = modelDirectoryPath(for: modelId)
-        let encoder = modelDir.appendingPathComponent("encoder.int8.onnx")
-        let decoder = modelDir.appendingPathComponent("decoder.int8.onnx")
-        let joiner = modelDir.appendingPathComponent("joiner.int8.onnx")
-        let tokens = modelDir.appendingPathComponent("tokens.txt")
         
         var allText = [String]()
         
         for chunkURL in chunkURLs {
-            let result = runSherpaOnnxSync(audioURL: chunkURL, sherpaURL: sherpaURL,
-                                           encoder: encoder, decoder: decoder,
-                                           joiner: joiner, tokens: tokens)
+            let result = runSherpaOnnxSync(audioURL: chunkURL, sherpaURL: sherpaURL, modelDir: modelDir)
             switch result {
             case .success(let text):
                 if !text.isEmpty { allText.append(text) }
@@ -208,20 +219,49 @@ class ParakeetManager {
         DispatchQueue.main.async { completion(.success([segment])) }
     }
 
-    private func runSherpaOnnxSync(audioURL: URL, sherpaURL: URL, encoder: URL, decoder: URL, joiner: URL, tokens: URL) -> Result<String, Error> {
+    private func runSherpaOnnxSync(audioURL: URL, sherpaURL: URL, modelDir: URL) -> Result<String, Error> {
+        let fm = FileManager.default
+        let items = (try? fm.contentsOfDirectory(atPath: modelDir.path)) ?? []
+        
+        guard let tokensFile = items.first(where: { $0.hasSuffix("tokens.txt") }) else {
+            return .failure(ParakeetError.inferenceFailed("Missing tokens.txt file"))
+        }
+        let tokensPath = modelDir.appendingPathComponent(tokensFile).path
+        
+        var args = [
+            "--tokens=\(tokensPath)",
+            "--num-threads=4",
+            "--sample-rate=16000",
+            "--decoding-method=greedy_search"
+        ]
+        
+        // Find architecture specific ONNX files
+        let encoder = items.first(where: { $0.contains("encoder") })
+        let decoder = items.first(where: { $0.contains("decoder") })
+        let joiner = items.first(where: { $0.contains("joiner") })
+        
+        let nemoCTC = items.first(where: { $0.hasPrefix("model") && $0.hasSuffix(".onnx") })
+        
+        if let e = encoder, let d = decoder, let j = joiner {
+            // Transducer models (Parakeet, Zipformer)
+            args.append("--encoder=\(modelDir.appendingPathComponent(e).path)")
+            args.append("--decoder=\(modelDir.appendingPathComponent(d).path)")
+            args.append("--joiner=\(modelDir.appendingPathComponent(j).path)")
+            let featDim = (modelDir.path.lowercased().contains("parakeet") || e.lowercased().contains("parakeet")) ? "128" : "80"
+            args.append("--feat-dim=\(featDim)")
+        } else if let e = encoder, let d = decoder {
+            // Whisper models have an encoder and decoder but NO joiner
+            args.append("--whisper-encoder=\(modelDir.appendingPathComponent(e).path)")
+            args.append("--whisper-decoder=\(modelDir.appendingPathComponent(d).path)")
+        } else if let n = nemoCTC {
+            args.append("--nemo-ctc=\(modelDir.appendingPathComponent(n).path)")
+        }
+        
+        args.append(audioURL.path)
+        
         let process = Process()
         process.executableURL = sherpaURL
-        process.arguments = [
-            "--encoder=\(encoder.path)",
-            "--decoder=\(decoder.path)",
-            "--joiner=\(joiner.path)",
-            "--tokens=\(tokens.path)",
-            "--num-threads=4",
-            "--feat-dim=128",
-            "--sample-rate=16000",
-            "--decoding-method=greedy_search",
-            audioURL.path
-        ]
+        process.arguments = args
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe

@@ -23,16 +23,16 @@ enum AppConfig {
     
     // Window dimensions
     struct WindowDimensions {
-        static let minWidth: CGFloat = 1150
-        static let idealWidth: CGFloat = 1300
+        static let minWidth: CGFloat = 950
+        static let idealWidth: CGFloat = 950
         static let maxWidth: CGFloat = CGFloat.infinity
         
-        static let minHeight: CGFloat = 600
-        static let idealHeight: CGFloat = 800
+        static let minHeight: CGFloat = 650
+        static let idealHeight: CGFloat = 700
         static let maxHeight: CGFloat = CGFloat.infinity
         
         // Initial window size (can be larger than min, smaller than max)
-        static let initialWidth: CGFloat = 1300
-        static let initialHeight: CGFloat = 800
+        static let initialWidth: CGFloat = 950
+        static let initialHeight: CGFloat = 700
     }
 }

@@ -64,13 +64,39 @@ struct CloudTranscriptionSettingsView: View {
                             .disabled(isTestRunning)
                             .onChange(of: localToggleState) { newValue in
                                 if newValue {
-                                    verifyAndEnable()
+                                    // Only verify if we are turning it ON from an OFF state
+                                    // This prevents the automatic refresh when visiting the screen
+                                    if !useCloudEngine {
+                                        verifyAndEnable()
+                                    }
                                 } else {
                                     useCloudEngine = false
                                 }
                             }
                     }
                 }
+                HStack(spacing: 10) {
+                                Image(systemName: "cloud")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Recommended for slow devices")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.orange)
+                                    Text("Cloud models send audio to the internet for processing.")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.orange.opacity(0.8))
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(Color.orange.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+                            )
+                            .cornerRadius(10)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             
@@ -109,7 +135,7 @@ struct CloudTranscriptionSettingsView: View {
                 case .openai:
                     providerConfigView(title: "OpenAI API Key", icon: "sparkles", color: .purple, value: $openAIApiKey, placeholder: "sk-proj-...", modelBinding: $openAIModel, availableModels: ["whisper-1"])
                 case .deepgram:
-                    providerConfigView(title: "Deepgram API Token", icon: "waveform", color: .cyan, value: $deepgramApiKey, placeholder: "Token...", modelBinding: $deepgramModel, availableModels: ["nova-2", "nova", "base"])
+                    providerConfigView(title: "Deepgram API Key", icon: "waveform", color: .cyan, value: $deepgramApiKey, placeholder: "Token...", modelBinding: $deepgramModel, availableModels: ["nova-2", "nova", "base"])
                 case .elevenlabs:
                     providerConfigView(title: "ElevenLabs API Key", icon: "mic.fill", color: .orange, value: $elevenLabsApiKey, placeholder: "sk_...", modelBinding: $elevenLabsModel, availableModels: ["scribe_v1"])
                 case .groq:
@@ -118,8 +144,28 @@ struct CloudTranscriptionSettingsView: View {
                     customProviderConfigView()
                 }
                 
-                // Test Button
-                HStack {
+                // Action Buttons
+                HStack(spacing: 12) {
+                    if let url = getAPIKeyURL(for: currentProvider) {
+                        Button(action: {
+                            if let nsUrl = URL(string: url) {
+                                NSWorkspace.shared.open(nsUrl)
+                            }
+                        }) {
+                            Text("Get Free Key")
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(Color.white.opacity(0.1))
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
                     Button(action: {
                         Task {
                             await executeTest()
@@ -279,6 +325,16 @@ struct CloudTranscriptionSettingsView: View {
                 self.isTestRunning = false
             }
             return false
+        }
+    }
+    
+    private func getAPIKeyURL(for provider: CloudTranscriptionProvider) -> String? {
+        switch provider {
+        case .openai: return "https://platform.openai.com/api-keys"
+        case .deepgram: return "https://console.deepgram.com/signup"
+        case .elevenlabs: return "https://elevenlabs.io/"
+        case .groq: return "https://console.groq.com/keys"
+        case .custom: return nil
         }
     }
 }

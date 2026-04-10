@@ -31,9 +31,9 @@ struct AITranslationSettingsView: View {
     @AppStorage("anthropicTranslationModel") private var anthropicModel: String = "claude-3-5-sonnet-latest"
     @AppStorage("groqTranslationModel") private var groqModel: String = "llama-3.3-70b-versatile"
     @AppStorage("deepseekTranslationModel") private var deepseekModel: String = "deepseek-chat"
-    @AppStorage("googleTranslationModel") private var googleModel: String = "gemini-2.0-flash"
+    @AppStorage("googleTranslationModel") private var googleModel: String = "gemini-3-flash-preview"
     
-    @AppStorage("translationTargetLanguage") private var targetLanguage: String = "EN-US"
+    @AppStorage("translationTargetLanguage") private var targetLanguage: String = "en"
     
     @AppStorage("ollamaTranslationBaseURL") private var ollamaBaseURL: String = "http://localhost:11434/v1/chat/completions"
     @AppStorage("ollamaTranslationModel") private var ollamaModel: String = "llama3"
@@ -75,7 +75,11 @@ struct AITranslationSettingsView: View {
                             .disabled(isTestRunning)
                             .onChange(of: localToggleState) { newValue in
                                 if newValue {
-                                    verifyAndEnable()
+                                    // Only verify if we are turning it ON from an OFF state
+                                    // This prevents the automatic refresh when visiting the screen
+                                    if !useAITranslation {
+                                        verifyAndEnable()
+                                    }
                                 } else {
                                     useAITranslation = false
                                 }
@@ -135,13 +139,35 @@ struct AITranslationSettingsView: View {
                 case .openai:
                     llmConfigView(title: "OpenAI API Key", icon: "cube.fill", color: .green, value: $openAIApiKey, placeholder: "sk-proj-...", modelBinding: $openaiModel, availableModels: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1-mini", "o3-mini"])
                 case .anthropic:
-                    llmConfigView(title: "Anthropic API Key", icon: "brain.head.profile", color: .orange, value: $anthropicApiKey, placeholder: "sk-ant-...", modelBinding: $anthropicModel, availableModels: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"])
+                    llmConfigView(title: "Anthropic API Key", icon: "brain.head.profile", color: .orange, value: $anthropicApiKey, placeholder: "sk-ant-...", modelBinding: $anthropicModel, availableModels: [
+                        // Claude 4.x (2026 latest)
+                        "claude-opus-4-6-20260205", "claude-sonnet-4-6-20260217", "claude-haiku-4-5-20251015",
+                        // Claude 4 (2025)
+                        "claude-opus-4-5-20251101", "claude-sonnet-4-5-20250922", "claude-sonnet-4-20250522",
+                        // Claude 3.7
+                        "claude-sonnet-3-7-20250219",
+                        // Claude 3.5
+                        "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest",
+                        // Claude 3 (legacy)
+                        "claude-3-opus-20240229", "claude-3-haiku-20240307"
+                    ])
                 case .groq:
                     llmConfigView(title: "Groq API Key", icon: "bolt.fill", color: .red, value: $groqApiKey, placeholder: "gsk_...", modelBinding: $groqModel, availableModels: ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama3-70b-8192"])
                 case .deepseek:
                     llmConfigView(title: "Deepseek API Key", icon: "magnifyingglass", color: .blue, value: $deepseekApiKey, placeholder: "sk-...", modelBinding: $deepseekModel, availableModels: ["deepseek-chat", "deepseek-reasoner"])
                 case .google:
-                    llmConfigView(title: "Google Gemini API Key", icon: "sparkles.rectangle.stack.fill", color: .blue, value: $googleApiKey, placeholder: "AIza...", modelBinding: $googleModel, availableModels: ["gemini-3.1-pro", "gemini-3.1-flash", "gemini-3-pro", "gemini-2.5-pro"])
+                    llmConfigView(title: "Google Gemini API Key", icon: "sparkles.rectangle.stack.fill", color: .blue, value: $googleApiKey, placeholder: "AIza...", modelBinding: $googleModel, availableModels: [
+                        "gemini-3.1-pro-preview",
+                        "gemini-3.1-flash-lite-preview",
+                        "gemini-3-pro-preview",
+                        "gemini-3-flash-preview",
+                        "gemini-2.5-pro",
+                        "gemini-2.5-flash",
+                        "gemini-2.5-flash-lite",
+                        "gemini-2.0-flash",
+                        "gemini-2.0-flash-lite",
+                        "gemini-pro-latest"
+                    ])
                 case .ollama:
                     ollamaConfigView()
                 case .custom:
@@ -150,7 +176,27 @@ struct AITranslationSettingsView: View {
                 
                 // Test Button
                 if currentProvider != .apple {
-                    HStack {
+                    HStack(spacing: 12) {
+                        if let url = getAPIKeyURL(for: currentProvider) {
+                            Button(action: {
+                                if let nsUrl = URL(string: url) {
+                                    NSWorkspace.shared.open(nsUrl)
+                                }
+                            }) {
+                                Text("Get Free Key")
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(Color.white.opacity(0.1))
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
                         Button(action: {
                             Task {
                                 await executeTest()
@@ -199,6 +245,74 @@ struct AITranslationSettingsView: View {
         }
     }
     
+    private func fetchLatestModels(for provider: TranslationProvider) {
+        let key: String
+        let baseUrl: String
+        let cacheKey: String
+        
+        switch provider {
+        case .google:
+            key = googleApiKey
+            baseUrl = ""
+            cacheKey = "google"
+        case .openai:
+            key = openAIApiKey
+            baseUrl = ""
+            cacheKey = "openai"
+        case .anthropic:
+            key = anthropicApiKey
+            baseUrl = ""
+            cacheKey = "anthropic"
+        case .groq:
+            key = groqApiKey
+            baseUrl = "https://api.groq.com/openai/v1/chat/completions"
+            cacheKey = "groq"
+        case .deepseek:
+            key = deepseekApiKey
+            baseUrl = "https://api.deepseek.com/chat/completions"
+            cacheKey = "deepseek"
+        case .ollama:
+            key = ""
+            baseUrl = ollamaBaseURL
+            cacheKey = "ollama"
+        default: return
+        }
+        
+        if key.isEmpty && provider != .ollama {
+            testStatus = "Please enter an API key first."
+            return
+        }
+        
+        Task {
+            do {
+                let fetched: [String]
+                switch provider {
+                case .google:
+                    fetched = try await GeminiManager.shared.fetchAvailableModels(apiKey: key)
+                case .openai:
+                    fetched = try await OpenAIManager.shared.fetchAvailableModels(apiKey: key)
+                case .anthropic:
+                    fetched = try await AnthropicManager.shared.fetchAvailableModels(apiKey: key)
+                default:
+                    // Map TranslationProvider to LLMProvider for the generic fetch
+                    let llmProv: LLMProvider = (provider == .groq) ? .groq : (provider == .deepseek ? .deepseek : .ollama)
+                    fetched = try await ExtendedLLMManager.shared.fetchAvailableModels(apiKey: key, baseURL: baseUrl, provider: llmProv)
+                }
+                
+                DispatchQueue.main.async {
+                    ModelCacheManager.shared.saveModels(fetched, for: cacheKey)
+                    testStatus = "Fetched \(fetched.count) models"
+                    isTestSuccessful = true
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    testStatus = "Fetch failed: \(error.localizedDescription)"
+                    isTestSuccessful = false
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private func appleTranslationView() -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -237,13 +351,47 @@ struct AITranslationSettingsView: View {
             HStack {
                 Text("Model:")
                     .foregroundColor(.white.opacity(0.8))
+                
+                let cacheKey: String = {
+                    if title.contains("Google") { return "google" }
+                    if title.contains("OpenAI") { return "openai" }
+                    if title.contains("Anthropic") { return "anthropic" }
+                    if title.contains("Groq") { return "groq" }
+                    if title.contains("Deepseek") { return "deepseek" }
+                    return title.lowercased()
+                }()
+                
+                let provider: TranslationProvider = {
+                    if title.contains("Google") { return .google }
+                    if title.contains("OpenAI") { return .openai }
+                    if title.contains("Anthropic") { return .anthropic }
+                    if title.contains("Groq") { return .groq }
+                    if title.contains("Deepseek") { return .deepseek }
+                    return .openai
+                }()
+
+                let combinedModels = ModelCacheManager.shared.mergeModels(
+                    predefined: availableModels,
+                    fetched: ModelCacheManager.shared.getModels(for: cacheKey)
+                )
+
                 Picker("", selection: modelBinding) {
-                    ForEach(availableModels, id: \.self) { model in
+                    ForEach(combinedModels, id: \.self) { model in
                         Text(model).tag(model)
                     }
                 }
                 .pickerStyle(MenuPickerStyle())
                 .frame(width: 200)
+
+                Button(action: {
+                    fetchLatestModels(for: provider)
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 14))
+                        .foregroundColor(color)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("Refresh model list")
             }
         }
     }
@@ -325,7 +473,11 @@ struct AITranslationSettingsView: View {
                 if anthropicApiKey.isEmpty { throw NSError(domain: "Missing Key", code: -1) }
                 _ = try await AnthropicManager.shared.improveText(prompt: "Translate to \(targetLanguage)", text: "Hello", model: anthropicModel)
                 valid = true; msg = "Anthropic verified!"
-            case .groq, .deepseek, .ollama, .custom, .google:
+            case .google:
+                if googleApiKey.isEmpty { throw NSError(domain: "Missing Key", code: -1) }
+                _ = try await GeminiManager.shared.improveText(systemPrompt: "Respond 'OK'", userText: "Ping", apiKey: googleApiKey, model: googleModel)
+                valid = true; msg = "Google verified!"
+            case .groq, .deepseek, .ollama, .custom:
                 let extProvider: LLMProvider
                 let key: String
                 let url: String
@@ -336,8 +488,6 @@ struct AITranslationSettingsView: View {
                     extProvider = .groq; key = groqApiKey; url = "https://api.groq.com/openai/v1/chat/completions"; modelUsed = groqModel
                 case .deepseek:
                     extProvider = .deepseek; key = deepseekApiKey; url = "https://api.deepseek.com/chat/completions"; modelUsed = deepseekModel
-                case .google:
-                    extProvider = .google; key = googleApiKey; url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"; modelUsed = googleModel
                 case .ollama:
                     extProvider = .ollama; key = ""; url = ollamaBaseURL; modelUsed = ollamaModel
                 case .custom:
@@ -358,5 +508,18 @@ struct AITranslationSettingsView: View {
             self.isTestRunning = false
         }
         return valid
+    }
+    
+    private func getAPIKeyURL(for provider: TranslationProvider) -> String? {
+        switch provider {
+        case .apple: return nil
+        case .deepl: return "https://www.deepl.com/pro-api"
+        case .openai: return "https://platform.openai.com/api-keys"
+        case .anthropic: return "https://console.anthropic.com/settings/keys"
+        case .groq: return "https://console.groq.com/keys"
+        case .deepseek: return "https://platform.deepseek.com/api_keys"
+        case .google: return "https://aistudio.google.com/app/apikey"
+        case .ollama, .custom: return nil
+        }
     }
 }

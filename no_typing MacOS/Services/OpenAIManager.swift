@@ -97,4 +97,35 @@ class OpenAIManager {
         
         throw OpenAIError.decodingError
     }
+    
+    /// Fetch current available models from OpenAI
+    func fetchAvailableModels(apiKey: String) async throws -> [String] {
+        guard let url = URL(string: "https://api.openai.com/v1/models") else {
+            throw OpenAIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw OpenAIError.invalidResponse
+        }
+        
+        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let models = json["data"] as? [[String: Any]] {
+            return models.compactMap { dict -> String? in
+                guard let id = dict["id"] as? String else { return nil }
+                // Optional: filter for chat models (gpt-...)
+                if id.hasPrefix("gpt") || id.hasPrefix("o1") || id.hasPrefix("o3") {
+                    return id
+                }
+                return nil
+            }
+        }
+        
+        throw OpenAIError.decodingError
+    }
 }

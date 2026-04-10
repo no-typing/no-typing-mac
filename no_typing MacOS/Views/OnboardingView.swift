@@ -439,10 +439,10 @@ struct OnboardingView: View {
                         .frame(maxWidth: 400)
                     
                     // Added Key benefits
-                    VStack(spacing: 16) {
-                        PermissionBenefitRow(icon: "mic.fill", text: "Voice-to-Text Transcription")
+                    HStack(spacing: 16) {
+                        PermissionBenefitRow(icon: "mic.fill", text: "Voice-to-Text")
                         PermissionBenefitRow(icon: "xmark.bin.fill", text: "Recordings Never Saved")
-                        PermissionBenefitRow(icon: "laptopcomputer", text: "Processed Locally on Your Mac")
+                        PermissionBenefitRow(icon: "laptopcomputer", text: "Processed Locally")
                     }
                     .padding(.vertical, 8)
                 }
@@ -568,7 +568,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: 400)
                     
                     // Key benefits
-                    VStack(spacing: 16) {
+                    HStack(spacing: 16) {
                         PermissionBenefitRow(icon: "apps.iphone", text: "Works in Any App")
                         PermissionBenefitRow(icon: "text.cursor", text: "Insert Text Anywhere")
                         PermissionBenefitRow(icon: "keyboard", text: "Hotkey Detection")
@@ -576,9 +576,6 @@ struct OnboardingView: View {
                     .padding(.vertical, 8)
                 }
                 .padding(.horizontal, 40)
-                
-                Spacer()
-                    .frame(height: 20)
                 
                 // Permission button area
                 VStack(spacing: 16) {

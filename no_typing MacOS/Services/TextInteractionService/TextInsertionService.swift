@@ -20,6 +20,8 @@ class TextInsertionService {
     private var streamingInsertedLength: Int = 0
     private var streamingInsertedText: String = ""
     private var finalizedText: String = ""
+    private var capturedPID: pid_t?
+    private var capturedAppIcon: NSImage?
     
     // Service dependencies
     private let textFormatter: TextFormatter
@@ -69,6 +71,19 @@ class TextInsertionService {
         self.activeTextField = nil
         self.activeTextView = nil
         print("🔄 Unregistered all text components")
+    }
+    
+    /// Captures the PID of the currently focused application
+    func captureFocusedPID() {
+        self.capturedPID = accessibilityTextInsertion.getCurrentFocusedPID()
+        
+        if let pid = self.capturedPID {
+            self.capturedAppIcon = NSRunningApplication(processIdentifier: pid)?.icon
+        } else {
+            self.capturedAppIcon = nil
+        }
+        
+        print("🎯 capturedFocusedPID: \(capturedPID ?? 0), icon: \(capturedAppIcon != nil ? "Yes" : "No")")
     }
     
     /// Handles a transcription result from speech recognition
@@ -163,6 +178,11 @@ class TextInsertionService {
         print("🧹 Reset all text insertion state")
     }
     
+    /// Alias for resetTextInsertionState, used by TranscriptionResultHandler
+    func resetTextTrackingState() {
+        resetTextInsertionState()
+    }
+    
     /// Get the finalized text
     /// - Returns: The current finalized text
     func getFinalizedText() -> String {
@@ -179,15 +199,14 @@ class TextInsertionService {
     }
     
     /// Alias for resetTextInsertionState, used by TranscriptionResultHandler
-    func resetTextTrackingState() {
-        resetTextInsertionState()
-    }
-    
-    /// Reset text insertion state specifically for a new recording
+    /// Reset text tracking state specifically for a new recording
     /// Called when a new recording session begins
     func resetForNewRecording() {
         // Reset all text tracking state
         resetTextInsertionState()
+        
+        // Capture focus at start
+        captureFocusedPID()
         
         // Set flag to indicate this is a new recording session
         isNewRecordingSession = true
@@ -290,6 +309,32 @@ class TextInsertionService {
             return
         }
         
+        // Check for app-level focus loss
+        if let startPID = capturedPID, 
+           let currentPID = accessibilityTextInsertion.getCurrentFocusedPID(), 
+           startPID != currentPID {
+            
+            print("⚠️ Focus shifted from app \(startPID) to \(currentPID). Falling back to clipboard.")
+            
+            // Format for clipboard (which is basically already done by now)
+            let formattedFinal = finalText + " "
+            
+            // Copy to clipboard without pasting or preserving old content
+            clipboardTextInsertion.copyToClipboard(formattedFinal)
+            
+            // Notify user
+            AudioHUDService.shared.showStatusNotification(
+                title: "Focus Lost", 
+                message: "Text copied to clipboard", 
+                icon: "doc.on.clipboard",
+                appIcon: capturedAppIcon
+            )
+            
+            // Record finalized text even if focus lost
+            self.finalizedText += " " + finalText
+            return
+        }
+        
         // Try accessibility API as fallback
         let _ = accessibilityTextInsertion.replaceTemporaryText(
             temporaryText,
@@ -346,6 +391,30 @@ class TextInsertionService {
                     self?.streamingInsertedLength = length
                 }
             )
+            return
+        }
+        
+        // Check for app-level focus loss
+        if let startPID = capturedPID, 
+           let currentPID = accessibilityTextInsertion.getCurrentFocusedPID(), 
+           startPID != currentPID {
+            
+            print("⚠️ Focus shifted from app \(startPID) to \(currentPID). Falling back to clipboard.")
+            
+            // For final text, we copy and notify. For temporary, we just skip (don't spam notifications).
+            if !isTemporary {
+                let formattedFinal = textToInsert
+                clipboardTextInsertion.copyToClipboard(formattedFinal)
+                
+                AudioHUDService.shared.showStatusNotification(
+                    title: "Focus Lost", 
+                    message: "Text copied to clipboard", 
+                    icon: "doc.on.clipboard",
+                    appIcon: capturedAppIcon
+                )
+                
+                self.finalizedText += textToInsert
+            }
             return
         }
         

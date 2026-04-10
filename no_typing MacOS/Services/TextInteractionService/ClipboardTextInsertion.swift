@@ -39,6 +39,15 @@ class ClipboardTextInsertion {
         originalClipboardContent = nil
     }
     
+    /// Copies text to the clipboard without pasting
+    /// - Parameter text: The text to copy
+    func copyToClipboard(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        print("📋 Copied text to clipboard (no paste): \"\(text)\"")
+    }
+    
     /// Inserts text by copying to clipboard and pasting
     /// - Parameters:
     ///   - text: The text to insert
@@ -53,9 +62,7 @@ class ClipboardTextInsertion {
         }
         
         // Copy the text to clipboard
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        copyToClipboard(text)
         
         // Simulate CMD+V to paste
         let result = simulatePaste()

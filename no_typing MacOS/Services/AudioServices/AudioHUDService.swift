@@ -6,11 +6,17 @@ import Cocoa
 // The HUDMainController class should be available through the main module imports
 
 class AudioHUDService {
+    // Shared singleton instance
+    static let shared = AudioHUDService()
+    
     // Main controller for the HUD window
     private var notchIndicatorController: HUDMainController?
     
     // Device name notification window
     private var deviceNameWindow: DeviceNameWindowController?
+    
+    // Status/Action notification window
+    private var statusNotificationWindow: StatusNotificationWindowController?
     
     // Flag to prevent multiple simultaneous cleanup operations
     private var isHUDCleanupInProgress = false
@@ -100,6 +106,29 @@ class AudioHUDService {
     }
     
     
+    /// Shows a status/action notification (e.g., Focus Lost, Clipboard copied)
+    public func showStatusNotification(title: String, message: String, icon: String, appIcon: NSImage? = nil) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Hide any existing status window
+            self.statusNotificationWindow?.hideAnimated()
+            self.statusNotificationWindow = nil
+            
+            // Get parent window for positioning
+            let parentWindow = self.notchIndicatorController?.window
+            
+            // Create and show new status window
+            self.statusNotificationWindow = StatusNotificationWindowController(
+                title: title,
+                message: message,
+                icon: icon,
+                appIcon: appIcon,
+                parentWindow: parentWindow
+            )
+        }
+    }
+    
     // MARK: - Cleanup and Deinitialization
     
     /// Performs full cleanup of all HUD resources
@@ -117,6 +146,11 @@ class AudioHUDService {
             if let deviceWindow = self.deviceNameWindow {
                 deviceWindow.hideAnimated()
                 self.deviceNameWindow = nil
+            }
+            
+            if let statusWindow = self.statusNotificationWindow {
+                statusWindow.hideAnimated()
+                self.statusNotificationWindow = nil
             }
             
             self.isHUDCleanupInProgress = false

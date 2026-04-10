@@ -272,6 +272,9 @@ class GlobalHotkeyManager: ObservableObject {
                             
                             if !isRecording {
                                 print("🎙️ Push-to-talk: Key pressed, starting recording")
+                                // Capture focus as early as possible
+                                TextInsertionService.shared.captureFocusedPID()
+                                
                                 recordingMode = .transcriptionOnly
                                 audioManager.setRecordingMode(recordingMode)
                                 audioManager.startRecording()
@@ -439,6 +442,9 @@ class GlobalHotkeyManager: ObservableObject {
                         
                         if !isRecording {
                             print("🎙️ Push-to-talk: Key pressed, starting recording")
+                            // Capture focus as early as possible
+                            TextInsertionService.shared.captureFocusedPID()
+                            
                             recordingMode = .transcriptionOnly
                             audioManager.setRecordingMode(recordingMode)
                             audioManager.startRecording()
@@ -508,6 +514,9 @@ class GlobalHotkeyManager: ObservableObject {
             
             // Start recording in toggle mode
             print("🎙️ Toggle Mode: Starting recording")
+            // Capture focus as early as possible
+            TextInsertionService.shared.captureFocusedPID()
+            
             recordingMode = .transcriptionOnly
             audioManager.setRecordingMode(recordingMode)
             audioManager.startRecording()

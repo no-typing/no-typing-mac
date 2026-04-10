@@ -117,7 +117,7 @@ class AudioManager: ObservableObject {
     
     init() {
         // Initialize the AudioHUDService
-        self.audioHUDService = AudioHUDService()
+        self.audioHUDService = AudioHUDService.shared
         
         // Initialize audio engine service first
         

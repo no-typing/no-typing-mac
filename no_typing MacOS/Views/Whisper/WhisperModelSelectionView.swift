@@ -587,43 +587,41 @@ struct WhisperModelSelectionView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             AIRewriteSettingsView().padding(.bottom, 16)
                             
-                            if enableTranscriptionCleaning {
-                                // Tone Selection
-                                HStack(spacing: 8) {
-                                    Image(systemName: "text.bubble")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(.blue)
-                                    Text("AI Writing Tone")
-                                        .font(.body)
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    Picker("Tone", selection: $selectedTone) {
-                                        ForEach(toneCategories, id: \.name) { category in
-                                            Section(header: Text(category.name)) {
-                                                ForEach(category.tones, id: \.code) { tone in
-                                                    Text(tone.name)
-                                                        .tag(tone.code)
-                                                }
+                            // Tone Selection
+                            HStack(spacing: 8) {
+                                Image(systemName: "text.bubble")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.blue)
+                                Text("AI Writing Tone")
+                                    .font(.body)
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Picker("Tone", selection: $selectedTone) {
+                                    ForEach(toneCategories, id: \.name) { category in
+                                        Section(header: Text(category.name)) {
+                                            ForEach(category.tones, id: \.code) { tone in
+                                                Text(tone.name)
+                                                    .tag(tone.code)
                                             }
                                         }
                                     }
-                                    .frame(width: 200)
-                                    .onChange(of: selectedTone) { newValue in
-                                        UserDefaults.standard.set(newValue, forKey: "selectedTone")
-                                        NotificationCenter.default.post(
-                                            name: NSNotification.Name("SelectedToneChanged"),
-                                            object: nil,
-                                            userInfo: ["tone": newValue]
-                                        )
-                                    }
-                                }.padding(16)
-                                    .background(Color.white.opacity(0.05))
-                                    .cornerRadius(12)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                }
+                                .frame(width: 200)
+                                .onChange(of: selectedTone) { newValue in
+                                    UserDefaults.standard.set(newValue, forKey: "selectedTone")
+                                    NotificationCenter.default.post(
+                                        name: NSNotification.Name("SelectedToneChanged"),
+                                        object: nil,
+                                        userInfo: ["tone": newValue]
                                     )
-                            }
+                                }
+                            }.padding(16)
+                                .background(Color.white.opacity(0.05))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                )
                             
                             AITranslationSettingsView().padding(.top, 16)
                         }

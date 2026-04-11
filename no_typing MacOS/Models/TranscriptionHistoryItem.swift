@@ -9,8 +9,9 @@ struct TranscriptionHistoryItem: Codable, Identifiable {
     var wordCount: Int? = 0
     var timeOffset: TimeInterval? = 0
     var sourceMediaData: Data? = nil
+    var sourceAppBundleID: String? = nil
     
-    init(text: String, timestamp: Date = Date(), duration: TimeInterval? = nil, segments: [WhisperTranscriptionSegment]? = nil, wordCount: Int? = nil, timeOffset: TimeInterval? = 0, sourceMediaData: Data? = nil) {
+    init(text: String, timestamp: Date = Date(), duration: TimeInterval? = nil, segments: [WhisperTranscriptionSegment]? = nil, wordCount: Int? = nil, timeOffset: TimeInterval? = 0, sourceMediaData: Data? = nil, sourceAppBundleID: String? = nil) {
         self.id = UUID()
         self.text = text
         self.timestamp = timestamp
@@ -19,6 +20,7 @@ struct TranscriptionHistoryItem: Codable, Identifiable {
         self.wordCount = wordCount ?? text.split { $0.isWhitespace || $0.isPunctuation }.count
         self.timeOffset = timeOffset
         self.sourceMediaData = sourceMediaData
+        self.sourceAppBundleID = sourceAppBundleID
     }
     
     var formattedDate: String {

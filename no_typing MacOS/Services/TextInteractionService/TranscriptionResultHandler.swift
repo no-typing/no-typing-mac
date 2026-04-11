@@ -240,7 +240,8 @@ class TranscriptionResultHandler {
         
         // Add to history if it's final text (not temporary)
         if !isTemporary && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            TranscriptionHistoryManager.shared.addTranscription(text, duration: duration)
+            let bundleID = TextInsertionService.shared.currentCapturedBundleID
+            TranscriptionHistoryManager.shared.addTranscription(text, duration: duration, sourceAppBundleID: bundleID)
         }
 
         // Word counting removed - no longer tracking usage

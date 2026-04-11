@@ -69,11 +69,11 @@ class TranscriptionHistoryManager: ObservableObject {
         loadAndRolloverStats()
     }
     
-    func addTranscription(_ text: String, duration: TimeInterval? = nil, segments: [WhisperTranscriptionSegment]? = nil, sourceMediaData: Data? = nil) {
+    func addTranscription(_ text: String, duration: TimeInterval? = nil, segments: [WhisperTranscriptionSegment]? = nil, sourceMediaData: Data? = nil, sourceAppBundleID: String? = nil) {
         // Don't add empty transcriptions
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
-        let historyItem = TranscriptionHistoryItem(text: text, duration: duration, segments: segments, sourceMediaData: sourceMediaData)
+        let historyItem = TranscriptionHistoryItem(text: text, duration: duration, segments: segments, sourceMediaData: sourceMediaData, sourceAppBundleID: sourceAppBundleID)
         
         // Add to beginning of array
         transcriptionHistory.insert(historyItem, at: 0)

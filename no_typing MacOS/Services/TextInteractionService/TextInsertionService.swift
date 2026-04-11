@@ -23,6 +23,12 @@ class TextInsertionService {
     private var capturedPID: pid_t?
     private var capturedAppIcon: NSImage?
     
+    /// Returns the bundle identifier of the currently captured target application
+    var currentCapturedBundleID: String? {
+        guard let pid = capturedPID else { return nil }
+        return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+    }
+    
     // Service dependencies
     private let textFormatter: TextFormatter
     private let repetitionHandler: RepetitionHandler

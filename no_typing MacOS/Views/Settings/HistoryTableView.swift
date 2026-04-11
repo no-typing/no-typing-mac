@@ -135,6 +135,11 @@ struct HistoryTableView: View {
                     selectedItems.removeAll()
                 }
                 
+                // Items Count
+                Text("\(filteredItems.count) transcription\(filteredItems.count == 1 ? "" : "s")")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(ThemeColors.secondaryText)
+                
                 Spacer()
                 
                 // Bulk Actions
@@ -287,7 +292,15 @@ struct HistoryTableRow: View {
     @State private var isHovered = false
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
+            // Source App Icon
+            getAppIcon(for: item.sourceAppBundleID)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 20, height: 20)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .help(item.sourceAppBundleID ?? "Unknown Application")
+            
             // Text Column (expanding vertically if needed)
             Text(item.text)
                 .font(.system(size: 13))
@@ -352,5 +365,17 @@ struct HistoryTableRow: View {
         pasteboard.clearContents()
         pasteboard.setString(item.text, forType: .string)
         #endif
+    }
+    
+    private func getAppIcon(for bundleID: String?) -> Image {
+        if let bundleID = bundleID {
+            // Try to get icon for the specific bundle ID
+            if let path = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)?.path {
+                return Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+            }
+        }
+        
+        // Fallback: Use the main app's icon if unknown
+        return Image(nsImage: NSApp.applicationIconImage)
     }
 }

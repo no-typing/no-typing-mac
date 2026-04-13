@@ -77,8 +77,10 @@ struct HistoryTableView: View {
                 // Sync the update down to the global manager
                 historyManager.updateTranscription(updatedItem)
                 
-                // Allow the view to update
-                selectedItemForDetail = updatedItem
+                // Allow the view to update only if it is currently active
+                if selectedItemForDetail != nil {
+                    selectedItemForDetail = updatedItem
+                }
             }, onClose: {
                 withAnimation(.spring()) {
                     selectedItemForDetail = nil

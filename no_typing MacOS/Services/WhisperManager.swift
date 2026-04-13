@@ -156,14 +156,14 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             displayName: "Whisper Base",
             icon: "waveform",
             description: "Balanced speed and accuracy. Optimized for stable performance on all Macs.",
-            recommendation: "Best for Intel Macs"
+            recommendation: "Best for short transcriptions"
         ),
         "small": ModelDisplayInfo(
             id: "small",
             displayName: "Whisper Small",
             icon: "scope",
             description: "Higher accuracy with slightly longer processing time. Ideal when precision matters most.",
-            recommendation: "Light and Fast"
+            recommendation: "Fast and accurate"
         ),
         "large_v3": ModelDisplayInfo(
             id: "large_v3",

@@ -18,7 +18,7 @@ class PermissionManager {
     
     func checkMicrophonePermission(completion: @escaping (Bool) -> Void) {
         let permissionStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        print("🎤 DEBUG: Microphone status: \(permissionStatus.rawValue) (authorized = 3, denied = 1, restricted = 2, notDetermined = 0)")
+        // print("🎤 DEBUG: Microphone status: \(permissionStatus.rawValue) (authorized = 3, denied = 1, restricted = 2, notDetermined = 0)")
         
         let granted = permissionStatus == .authorized
         DispatchQueue.main.async {

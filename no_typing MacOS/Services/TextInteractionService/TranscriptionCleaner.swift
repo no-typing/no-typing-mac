@@ -224,7 +224,7 @@ class TranscriptionCleaner {
                 
             default: // Apple Intelligence
                 #if canImport(FoundationModels)
-                    if #available(macOS 15.1, *) {
+                    if #available(macOS 26.0, *) {
                         let session = LanguageModelSession()
                         let result = try await session.respond(to: prompt)
                         response = result.content

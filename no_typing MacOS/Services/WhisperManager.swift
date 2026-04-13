@@ -124,7 +124,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     @Published var errorMessage: String?
     @Published var availableModels: [WhisperModelInfo] = []
     @Published var customModels: [CustomModel] = []
-    @Published var selectedModelSize: String = "small"  // Default model
+    @Published var selectedModelSize: String = "base"  // Default model
 
     // Process management
     private var processQueue = DispatchQueue(label: "com.no-typing.whisper.process", qos: .userInitiated)
@@ -262,12 +262,8 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             else if savedModel == "largev3turbo" { selectedModelSize = "large_v3_turbo" }
             else { selectedModelSize = savedModel }
         } else {
-            // Default based on architecture
-            #if arch(arm64)
-            selectedModelSize = "small" // Default for Apple Silicon
-            #else
-            selectedModelSize = "base"  // Default for Intel (CPU)
-            #endif
+            // Default to base model for all architectures
+            selectedModelSize = "base"
             print("📦 [WhisperManager] No saved selection found, defaulting to: \(selectedModelSize)")
             
             // Save this to UserDefaults immediately to avoid it being nil next time

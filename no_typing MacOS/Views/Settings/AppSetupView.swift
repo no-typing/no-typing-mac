@@ -21,6 +21,8 @@ struct AppSetupView: View {
     @StateObject private var webhookManager = WebhookManager.shared
     @State private var voiceWebhookEndpointId: String = UserDefaults.standard.string(forKey: "voiceWebhookEndpointId") ?? ""
     
+    var onNavigateToWebhook: (() -> Void)? = nil
+    
     
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -212,11 +214,17 @@ struct AppSetupView: View {
             // Voice Webhook Section
             SettingsSectionView(
                 icon: "antenna.radiowaves.left.and.right",
-                title: "Dictation Webhook",
+                title: "Transmit Dictation",
                 description: "Forward dictation results to the selected webhook endpoint."
             ) {
                 HStack {
-                    Picker("Webhook", selection: Binding(
+                    VStack(alignment: .leading) {
+                        Text("Webhook")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    Spacer()
+                    Picker("Select", selection: Binding(
                         get: { voiceWebhookEndpointId },
                         set: { newValue in
                             voiceWebhookEndpointId = newValue
@@ -228,7 +236,17 @@ struct AppSetupView: View {
                             Text(endpoint.name).tag(endpoint.id.uuidString)
                         }
                     }
-                    .frame(width: 220)
+                    if onNavigateToWebhook != nil {
+                        Button(action: { 
+                            onNavigateToWebhook?()
+                        }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.blue)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Add or manage webhook endpoints")
+                    }
                 }
             }
 

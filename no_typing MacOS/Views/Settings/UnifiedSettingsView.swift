@@ -420,7 +420,11 @@ struct UnifiedSettingsView: View {
                 subtitle: "Configure general application settings"
             )
             
-            AppSetupView()
+            AppSetupView(onNavigateToWebhook: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    selectedSection = .integrations
+                }
+            })
                 .settingsCardStyle()
         }
     }

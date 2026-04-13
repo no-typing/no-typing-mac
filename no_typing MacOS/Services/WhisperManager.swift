@@ -543,6 +543,51 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         }
     }
 
+    /// Generates a minimal valid WAV file (0.1s of silence at 16kHz, mono, 16-bit PCM).
+    /// Used for model preloading validation since whisper requires a real audio file.
+    private func generateSilentWav(at url: URL) {
+        let sampleRate: UInt32 = 16000
+        let numChannels: UInt16 = 1
+        let bitsPerSample: UInt16 = 16
+        let numSamples: UInt32 = 1600 // 0.1 seconds at 16kHz
+        let dataSize = numSamples * UInt32(numChannels) * UInt32(bitsPerSample / 8)
+        
+        var data = Data()
+        
+        // RIFF header
+        data.append(contentsOf: "RIFF".utf8)
+        var chunkSize = dataSize + 36
+        data.append(Data(bytes: &chunkSize, count: 4))
+        data.append(contentsOf: "WAVE".utf8)
+        
+        // fmt sub-chunk
+        data.append(contentsOf: "fmt ".utf8)
+        var subChunk1Size: UInt32 = 16
+        data.append(Data(bytes: &subChunk1Size, count: 4))
+        var audioFormat: UInt16 = 1 // PCM
+        data.append(Data(bytes: &audioFormat, count: 2))
+        var channels = numChannels
+        data.append(Data(bytes: &channels, count: 2))
+        var rate = sampleRate
+        data.append(Data(bytes: &rate, count: 4))
+        var byteRate = sampleRate * UInt32(numChannels) * UInt32(bitsPerSample / 8)
+        data.append(Data(bytes: &byteRate, count: 4))
+        var blockAlign = numChannels * (bitsPerSample / 8)
+        data.append(Data(bytes: &blockAlign, count: 2))
+        var bps = bitsPerSample
+        data.append(Data(bytes: &bps, count: 2))
+        
+        // data sub-chunk
+        data.append(contentsOf: "data".utf8)
+        var dataChunkSize = dataSize
+        data.append(Data(bytes: &dataChunkSize, count: 4))
+        
+        // Silent audio samples (all zeros)
+        data.append(Data(count: Int(dataSize)))
+        
+        try? data.write(to: url)
+    }
+    
     private func preloadSelectedModel() {
         processQueue.async { [weak self] in
             guard let self = self else { return }
@@ -559,14 +604,14 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
             let modelPath = self.getModelDirectory().appendingPathComponent(selectedModel.fileName)
             guard FileManager.default.fileExists(atPath: modelPath.path) else {
-                print("Model file does not exist at path: \(modelPath.path)")
+                print("⚠️ Model file does not exist at path: \(modelPath.path)")
                 self.isPreloading = false
                 return
             }
 
             // Create a temporary process to preload the model
             guard let whisperURL = self.getWhisperExecutable() else {
-                print("Whisper executable not found")
+                print("⚠️ Whisper executable not found")
                 self.isPreloading = false
                 return
             }
@@ -574,17 +619,16 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             let process = Process()
             process.executableURL = whisperURL
             
-            // Set up a temporary file for testing
+            // Generate a tiny silent WAV file for validation
+            // (whisper requires a valid audio file, not a text file)
             let tempDir = FileManager.default.temporaryDirectory
-            let testFile = tempDir.appendingPathComponent("preload_test.txt")
-            
-            // Write a small test file
-            try? "test".write(to: testFile, atomically: true, encoding: .utf8)
+            let testWav = tempDir.appendingPathComponent("preload_test_\(UUID().uuidString).wav")
+            self.generateSilentWav(at: testWav)
 
             // Configure process for preloading
             process.arguments = [
                 "-m", modelPath.path,
-                "-f", testFile.path,
+                "-f", testWav.path,
                 "--no-timestamps",
                 "--language", "auto"
             ]
@@ -598,24 +642,33 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 process.waitUntilExit()
                 
                 // Clean up test file
-                try? FileManager.default.removeItem(at: testFile)
+                try? FileManager.default.removeItem(at: testWav)
+                
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: outputData, encoding: .utf8) ?? ""
 
                 if process.terminationStatus == 0 {
-                    print("Model preloaded successfully: \(selectedModel.fileName)")
+                    print("✅ Model preloaded successfully: \(selectedModel.fileName)")
                     self.preloadedModel = modelPath
                     self.preloadedModelSize = selectedModel.id
                     DispatchQueue.main.async {
                         self.isReady = true
                     }
                 } else {
-                    print("Failed to preload model")
+                    print("❌ Failed to preload model (exit code \(process.terminationStatus)): \(output)")
                     self.preloadedModel = nil
                     self.preloadedModelSize = nil
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Failed to preload model. The whisper binary may need to be rebuilt for this architecture."
+                    }
                 }
             } catch {
-                print("Error preloading model: \(error)")
+                print("❌ Error preloading model: \(error)")
                 self.preloadedModel = nil
                 self.preloadedModelSize = nil
+                DispatchQueue.main.async {
+                    self.errorMessage = "Error preloading model: \(error.localizedDescription)"
+                }
             }
 
             self.isPreloading = false

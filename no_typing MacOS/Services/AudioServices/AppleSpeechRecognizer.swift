@@ -39,7 +39,7 @@ class AppleSpeechRecognizer: NSObject, ObservableObject {
     
     private var isTransitioning = false
     private var pendingEngine: AVAudioEngine?
-    private let transitionQueue = DispatchQueue(label: "com.no_typing.speechrecognizer.transition")
+    private let transitionQueue = DispatchQueue(label: "com.no-typing.speechrecognizer.transition")
     
     override private init() {
         super.init()

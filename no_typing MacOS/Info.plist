@@ -4,6 +4,10 @@
 <dict>
     <key>NSAccessibilityUsageDescription</key>
     <string>No-Typing needs accessibility permission to read and write text in text fields of other applications.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>No-Typing needs microphone access to record your voice for transcription.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>No-Typing needs speech recognition permission to process your voice and generate live transcriptions.</string>
     <key>NSScreenCaptureUsageDescription</key>
     <string>No-Typing needs screen recording permission to capture and transcribe system audio.</string>
 </dict>

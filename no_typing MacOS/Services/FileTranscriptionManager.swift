@@ -254,7 +254,8 @@ class FileTranscriptionManager: ObservableObject {
                                 // Forward to file transcription webhook if configured
                                 if let idString = UserDefaults.standard.string(forKey: "fileTranscriptionWebhookEndpointId"),
                                    let endpointId = UUID(uuidString: idString) {
-                                    WebhookManager.shared.sendTranscript(text: formattedText, duration: duration, endpointId: endpointId)
+                                    let sourceName = "File: \(url.lastPathComponent)"
+                                    WebhookManager.shared.sendTranscript(text: formattedText, duration: duration, endpointId: endpointId, source: sourceName)
                                 }
                             }
                             
@@ -342,7 +343,8 @@ class FileTranscriptionManager: ObservableObject {
                         // Forward to file transcription webhook if configured
                         if let idString = UserDefaults.standard.string(forKey: "fileTranscriptionWebhookEndpointId"),
                            let endpointId = UUID(uuidString: idString) {
-                            WebhookManager.shared.sendTranscript(text: formattedText, duration: duration, endpointId: endpointId)
+                            let sourceName = "Cloud File: \(url.lastPathComponent)"
+                            WebhookManager.shared.sendTranscript(text: formattedText, duration: duration, endpointId: endpointId, source: sourceName)
                         }
                     }
                     

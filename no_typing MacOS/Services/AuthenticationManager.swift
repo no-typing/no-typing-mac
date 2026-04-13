@@ -21,7 +21,7 @@ class AuthenticationManager: NSObject, ObservableObject {
     static let shared = AuthenticationManager()
 
     // Logger for debugging and error tracking
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.no_typing", category: "AuthenticationManager")
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.no-typing", category: "AuthenticationManager")
 
     // Published properties for reactive UI updates
     @Published var currentUser: UserProfile? {
@@ -64,7 +64,7 @@ class AuthenticationManager: NSObject, ObservableObject {
 
         // Construct the Google OAuth URL
         // Note: In a production app, these values should be stored securely
-        let redirectURI = "com.no_typing.oauth:/oauthredirect"
+        let redirectURI = "com.no-typing.oauth:/oauthredirect"
 
         // Use the login endpoint from your backend
         let authURLString = "\(AppConfig.BACKEND_API_URL)/api/v1/auth/google?redirect_uri=\(redirectURI.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)"
@@ -76,7 +76,7 @@ class AuthenticationManager: NSObject, ObservableObject {
 
         logger.info("Initiating ASWebAuthenticationSession with auth URL: \(authURL)")
 
-        let scheme = "com.no_typing.oauth"
+        let scheme = "com.no-typing.oauth"
 
         let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { callbackURL, error in
             if let error = error {
@@ -440,7 +440,7 @@ extension AuthenticationManager: WKNavigationDelegate {
             logger.info("WebView navigating to: \(url)")
             
             // Check if the URL matches our custom scheme for OAuth redirect
-            if url.scheme == "com.no_typing.oauth" {
+            if url.scheme == "com.no-typing.oauth" {
                 logger.info("Detected redirect to app's custom scheme")
                 handleAuthRedirect(url: url)
                 decisionHandler(.cancel)

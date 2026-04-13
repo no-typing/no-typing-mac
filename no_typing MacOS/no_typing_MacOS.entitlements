@@ -50,13 +50,13 @@
 	<true/>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)com.no_typing</string>
+		<string>$(AppIdentifierPrefix)com.no-typing</string>
 	</array>
 	<key>com.apple.security.keychain</key>
 	<true/>
 	<key>com.apple.security.keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)com.no_typing.oauth</string>
+		<string>$(AppIdentifierPrefix)com.no-typing.oauth</string>
 	</array>
 	<key>com.apple.security.files.downloads.read-write</key>
     <true/>

@@ -45,7 +45,7 @@ class TranscriptionHistoryManager: ObservableObject {
     private let userDefaultsKey = "transcriptionHistory" // Keeping key for backward compatibility or migration if needed
     
     // File Storage properties
-    private let storageQueue = DispatchQueue(label: "com.no_typing.transcriptionHistory", qos: .background)
+    private let storageQueue = DispatchQueue(label: "com.no-typing.transcriptionHistory", qos: .background)
     private var historyFileURL: URL {
         let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
         let appSupportURL = urls[0].appendingPathComponent("No-Typing", isDirectory: true)
@@ -88,7 +88,8 @@ class TranscriptionHistoryManager: ObservableObject {
         // Broadcast to Webhooks if enabled
         if let idString = UserDefaults.standard.string(forKey: "voiceWebhookEndpointId"),
            let endpointId = UUID(uuidString: idString) {
-            WebhookManager.shared.sendTranscript(text: text, duration: duration, endpointId: endpointId)
+            let appName = AppUtils.getAppName(from: sourceAppBundleID)
+            WebhookManager.shared.sendTranscript(text: text, duration: duration, endpointId: endpointId, source: appName)
         }
         
         // Update stats (Calculated independently of the array bounds)

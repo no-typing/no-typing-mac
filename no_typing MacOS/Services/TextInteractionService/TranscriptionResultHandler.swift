@@ -11,7 +11,7 @@ class TranscriptionResultHandler {
     
     private init() {}
     
-    private let queue = DispatchQueue(label: "com.no_typing.transcriptionHandler")
+    private let queue = DispatchQueue(label: "com.no-typing.transcriptionHandler")
     
     
     /// Set block mode state

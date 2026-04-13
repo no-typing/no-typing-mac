@@ -60,7 +60,7 @@ ProcessProductPackaging /Users/user/Documents/Freelancers/Giddy/Dial8/dial8-open
     "com.apple.security.input.monitoring" = 1;
     "com.apple.security.keychain" = 1;
     "com.apple.security.keychain-access-groups" =     (
-        "2Z3N6S95DH.com.no_typing.oauth"
+        "2Z3N6S95DH.com.no-typing.oauth"
     );
     "com.apple.security.network.client" = 1;
     "com.apple.security.network.server" = 1;
@@ -103,7 +103,7 @@ ProcessProductPackaging /Users/user/Documents/Freelancers/Giddy/Dial8/dial8-open
     );
     "com.apple.security.webkit" = 1;
     "keychain-access-groups" =     (
-        "2Z3N6S95DH.com.no_typing"
+        "2Z3N6S95DH.com.no-typing"
     );
 }
     

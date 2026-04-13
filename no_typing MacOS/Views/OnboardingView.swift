@@ -240,8 +240,9 @@ struct OnboardingView: View {
                 // If onboarding is completed, do nothing
             }
             .onReceive(NotificationCenter.default.publisher(for: didBecomeActiveNotification)) { _ in
-                print("⌨️ ONBOARDING: Received didBecomeActive notification")
-                onAppDidBecomeActive()
+                print("⌨️ ONBOARDING: App became active, refreshing permissions...")
+                self.onAppDidBecomeActive()
+                self.checkPermissions()
             }
             .alert(isPresented: $showAlert) {
                 switch activeAlert {

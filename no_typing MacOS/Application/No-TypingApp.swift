@@ -132,6 +132,21 @@ struct ThinkingAloudApp: App {
 
     // Initialize the application and its core components
     init() {
+        // Single-instance protection: Terminate other instances of this app
+        #if os(macOS)
+        let runningApps = NSWorkspace.shared.runningApplications
+        if let currentBundleId = Bundle.main.bundleIdentifier {
+            let otherInstances = runningApps.filter { 
+                $0.bundleIdentifier == currentBundleId && $0.processIdentifier != ProcessInfo.processInfo.processIdentifier 
+            }
+            
+            for app in otherInstances {
+                print("🛡️ APP: Found another instance running (PID: \(app.processIdentifier)), terminating it...")
+                app.terminate()
+            }
+        }
+        #endif
+        
         // Logging moved to Manager for better ordering
     }
     

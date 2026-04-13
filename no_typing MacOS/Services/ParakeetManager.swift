@@ -285,7 +285,7 @@ class ParakeetManager {
         let joiner = modelDir.appendingPathComponent("joiner.int8.onnx")
         let tokens = modelDir.appendingPathComponent("tokens.txt")
         
-        let processQueue = DispatchQueue(label: "com.no_typing.parakeet.inference", qos: .userInitiated)
+        let processQueue = DispatchQueue(label: "com.no-typing.parakeet.inference", qos: .userInitiated)
         processQueue.async {
             let process = Process()
             process.executableURL = sherpaURL

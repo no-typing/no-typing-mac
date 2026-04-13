@@ -2,7 +2,7 @@ import Foundation
 
 class ModelCacheManager {
     static let shared = ModelCacheManager()
-    private let suiteName = "com.no_typing.model_cache"
+    private let suiteName = "com.no-typing.model_cache"
     private let userDefaults: UserDefaults
     
     private init() {

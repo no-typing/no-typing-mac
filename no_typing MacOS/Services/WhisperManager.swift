@@ -127,7 +127,7 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     @Published var selectedModelSize: String = "small"  // Default model
 
     // Process management
-    private var processQueue = DispatchQueue(label: "com.no_typing.whisper.process", qos: .userInitiated)
+    private var processQueue = DispatchQueue(label: "com.no-typing.whisper.process", qos: .userInitiated)
     private let processLock = NSLock()
     private var preloadedModel: URL?
     private var preloadedModelSize: String?

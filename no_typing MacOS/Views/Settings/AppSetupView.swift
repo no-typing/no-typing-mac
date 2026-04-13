@@ -88,6 +88,40 @@ struct AppSetupView: View {
                 .padding(8)
             }
             
+            // Troubleshooting Notice
+            if !allPermissionsGranted {
+                HStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.orange)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Permission Sync Error?")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.orange)
+                        
+                        Text("If settings show access but the app says denied, your Mac's privacy cache might be stale. Try running these commands in Terminal and then restart the app:")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("tccutil reset Microphone com.no-typing")
+                            Text("tccutil reset SpeechRecognition com.no-typing")
+                        }
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.orange.opacity(0.9))
+                        .padding(8)
+                        .background(Color.black.opacity(0.3))
+                        .cornerRadius(6)
+                        .textSelection(.enabled)
+                    }
+                }
+                .padding(12)
+                .background(Color.orange.opacity(0.05))
+                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.3), lineWidth: 1))
+            }
+            
             Divider().padding(.vertical, 8)
             
             // Startup Configuration Section
@@ -178,11 +212,10 @@ struct AppSetupView: View {
             // Voice Webhook Section
             SettingsSectionView(
                 icon: "antenna.radiowaves.left.and.right",
-                title: "Voice Webhook",
-                description: "Forward voice transcription results to the selected webhook endpoint."
+                title: "Dictation Webhook",
+                description: "Forward dictation results to the selected webhook endpoint."
             ) {
                 HStack {
-                    Spacer()
                     Picker("Webhook", selection: Binding(
                         get: { voiceWebhookEndpointId },
                         set: { newValue in
@@ -203,6 +236,10 @@ struct AppSetupView: View {
         // Use transparent background since this view is already wrapped in .settingsCardStyle() by the parent
         .background(Color.clear)
         .onAppear {
+            checkPermissions()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            print("🔄 App became active, refreshing permissions...")
             checkPermissions()
         }
         .alert(isPresented: $showAccessibilityPrompt) {

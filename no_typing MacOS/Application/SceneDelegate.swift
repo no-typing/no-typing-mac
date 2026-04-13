@@ -18,7 +18,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
-        if let url = URLContexts.first?.url, url.scheme == "com.no_typing.oauth" {
+        if let url = URLContexts.first?.url, url.scheme == "com.no-typing.oauth" {
             // OAuth handling removed
         }
     }

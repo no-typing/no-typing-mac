@@ -7,6 +7,10 @@ struct WebhookSettingsView: View {
     // Add form state
     @State private var newName: String = ""
     @State private var newURL: String = ""
+    @State private var newHeaders: [(key: String, value: String)] = []
+    @State private var headerKey: String = ""
+    @State private var headerValue: String = ""
+    @State private var showingHeadersEditor: Bool = false
     
     // Test state per endpoint
     @State private var testingEndpointId: UUID?
@@ -16,26 +20,34 @@ struct WebhookSettingsView: View {
         """
         {
           "text": "Your transcribed text here...",
-          "duration": 12.5,
           "timestamp": "\(ISO8601DateFormatter().string(from: Date()))",
-          "source": "No-Typing"
+          "source": "Notes App"
         }
         """
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Integrations & Webhooks")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Text("Forward completed transcripts as JSON payloads to Zapier, Make.com, n8n, Notion or any custom endpoint.")
-                    .font(.subheadline)
-                    .foregroundColor(ThemeColors.secondaryText)
-            }
-            
+                  HStack(spacing: 10) {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Please note that adding webhooks would not automatically forward transcriptions. You would need to enable forwarding of transcriptions under App Settings.")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.orange.opacity(0.8))
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(Color.orange.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+                            )
+                            .cornerRadius(10)
+          
             // Tab Toggle
             HStack(spacing: 0) {
                 Button(action: { withAnimation { selectedTab = 0 } }) {
@@ -123,19 +135,62 @@ struct WebhookSettingsView: View {
                     TextField("https://hooks.zapier.com/...", text: $newURL)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                     
-                    Button(action: {
-                        guard !newName.isEmpty, !newURL.isEmpty, newURL.lowercased().hasPrefix("http") else { return }
-                        webhookManager.addEndpoint(name: newName, url: newURL)
-                        newName = ""
-                        newURL = ""
-                    }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(newName.isEmpty || newURL.isEmpty ? .gray : ThemeColors.accent)
+                    Button(action: { showingHeadersEditor.toggle() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "list.bullet.indent")
+                            if !newHeaders.isEmpty {
+                                Text("\(newHeaders.count)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 4)
+                                    .background(ThemeColors.accent)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
-                    .disabled(newName.isEmpty || newURL.isEmpty || !newURL.lowercased().hasPrefix("http"))
+                    .help("Manage Headers")
+            }
+                
+                HStack(spacing: 8) {
+                    if showingHeadersEditor {
+                        headersEditor
+                            .padding(10)
+                            .background(Color.black.opacity(0.2))
+                            .cornerRadius(8)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
+                Button(action: {
+                    guard !newName.isEmpty, !newURL.isEmpty, newURL.lowercased().hasPrefix("http") else { return }
+                    
+                    var headersDict: [String: String] = [:]
+                    for pair in newHeaders {
+                        if !pair.key.isEmpty {
+                            headersDict[pair.key] = pair.value
+                        }
+                    }
+                    
+                    webhookManager.addEndpoint(name: newName, url: newURL, headers: headersDict)
+                    newName = ""
+                    newURL = ""
+                    newHeaders = []
+                }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Save")
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(newName.isEmpty || newURL.isEmpty ? .gray : .white)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(8) }
+                .buttonStyle(.plain)
+                .disabled(newName.isEmpty || newURL.isEmpty || !newURL.lowercased().hasPrefix("http"))
             }
             
             Divider().opacity(0.3)
@@ -192,6 +247,16 @@ struct WebhookSettingsView: View {
                     .foregroundColor(ThemeColors.secondaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                
+                if !endpoint.headers.isEmpty {
+                    Text("\(endpoint.headers.count) header\(endpoint.headers.count == 1 ? "" : "s")")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(ThemeColors.accent.opacity(0.8))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(ThemeColors.accent.opacity(0.1))
+                        .cornerRadius(3)
+                }
             }
             
             Spacer()
@@ -331,6 +396,70 @@ struct WebhookSettingsView: View {
         .padding(8)
         .background(Color.white.opacity(0.02))
         .cornerRadius(6)
+    }
+    
+    // MARK: - Headers Editor View
+    
+    private var headersEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Custom HTTP Headers")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.white.opacity(0.7))
+            
+            // Current Headers
+            if !newHeaders.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(0..<newHeaders.count, id: \.self) { index in
+                        HStack {
+                            Text(newHeaders[index].key)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.9))
+                            Text(":")
+                                .foregroundColor(.white.opacity(0.4))
+                            Text(newHeaders[index].value)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(ThemeColors.secondaryText)
+                            Spacer()
+                            Button(action: { newHeaders.remove(at: index) }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.red.opacity(0.6))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(4)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(4)
+                    }
+                }
+            }
+            
+            // Add New Header Row
+            HStack(spacing: 8) {
+                TextField("Key", text: $headerKey)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(size: 11, design: .monospaced))
+                
+                TextField("Value", text: $headerValue)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.system(size: 11, design: .monospaced))
+                
+                Button(action: {
+                    guard !headerKey.isEmpty else { return }
+                    newHeaders.append((key: headerKey, value: headerValue))
+                    headerKey = ""
+                    headerValue = ""
+                }) {
+                    Image(systemName: "plus.circle")
+                        .foregroundColor(headerKey.isEmpty ? .gray : .green)
+                }
+                .buttonStyle(.plain)
+                .disabled(headerKey.isEmpty)
+            }
+            
+            Text("Common headers: Authorization, X-API-Key, etc.")
+                .font(.system(size: 9))
+                .foregroundColor(.white.opacity(0.4))
+        }
     }
     
     // MARK: - Actions

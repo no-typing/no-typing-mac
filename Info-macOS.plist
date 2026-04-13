@@ -22,11 +22,11 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.no_typing.oauth</string>
+			<string>com.no-typing.oauth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.no_typing.oauth</string>
-				<string>no_typing</string>
+				<string>com.no-typing.oauth</string>
+				<string>no-typing</string>
 			</array>
 		</dict>
 	</array>
@@ -34,6 +34,8 @@
 	<string>16</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
+	<key>LSUIElement</key>
+	<true/>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>NSAccessibilityUsageDescription</key>

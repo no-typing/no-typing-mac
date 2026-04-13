@@ -275,16 +275,6 @@ struct TranscribeFileView: View {
         VStack(alignment: .leading, spacing: 24) {
             // Header
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Transcribe Media")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Text("Upload an audio/video file or paste a social media link to generate a transcription offline.")
-                        .font(.subheadline)
-                        .foregroundColor(ThemeColors.secondaryText)
-                }
-                
                 // Mode Toggle
                 HStack(spacing: 0) {
                     Button(action: { 
@@ -442,7 +432,7 @@ struct TranscribeFileView: View {
                     Spacer()
                     webhookPicker
                 }
-                Text("Only manually transcribed media is sent to this endpoint. Voice webhook can be found under App Settings.")
+                Text("Only manually transcribed media is sent to this endpoint.")
                     .font(.system(size: 11))
                     .foregroundColor(ThemeColors.secondaryText)
             }

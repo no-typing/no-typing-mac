@@ -5,7 +5,7 @@ class TextSelectionService {
     static let shared = TextSelectionService()
     
     // Use a queue for text retrieval operations
-    private let operationQueue = DispatchQueue(label: "com.no_typing.textSelectionService", qos: .userInitiated)
+    private let operationQueue = DispatchQueue(label: "com.no-typing.textSelectionService", qos: .userInitiated)
     
     // Keep track of which apps have failed accessibility checks
     private var accessibilityRestrictedApps = Set<String>()

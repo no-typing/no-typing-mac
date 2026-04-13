@@ -18,7 +18,7 @@ class WatchFolderManager: ObservableObject {
     }
     
     private var folderMonitorSource: DispatchSourceFileSystemObject?
-    private let queue = DispatchQueue(label: "com.no_typing.watchfolder", qos: .background)
+    private let queue = DispatchQueue(label: "com.no-typing.watchfolder", qos: .background)
     
     // Support file types
     private let supportedExtensions = ["mp3", "wav", "m4a", "ogg", "opus", "mov", "mp4"]

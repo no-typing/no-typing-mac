@@ -6,12 +6,14 @@ struct WebhookEndpoint: Codable, Identifiable, Equatable {
     let id: UUID
     var name: String
     var url: String
+    var headers: [String: String]
     let createdAt: Date
     
-    init(name: String, url: String) {
+    init(name: String, url: String, headers: [String: String] = [:]) {
         self.id = UUID()
         self.name = name
         self.url = url
+        self.headers = headers
         self.createdAt = Date()
     }
 }
@@ -78,8 +80,8 @@ class WebhookManager: ObservableObject {
     
     // MARK: - Endpoints CRUD
     
-    func addEndpoint(name: String, url: String) {
-        let endpoint = WebhookEndpoint(name: name, url: url)
+    func addEndpoint(name: String, url: String, headers: [String: String] = [:]) {
+        let endpoint = WebhookEndpoint(name: name, url: url, headers: headers)
         endpoints.append(endpoint)
         saveEndpoints()
     }
@@ -105,7 +107,7 @@ class WebhookManager: ObservableObject {
     
     // MARK: - Send Transcript
     
-    func sendTranscript(text: String, duration: TimeInterval?, endpointId: UUID?) {
+    func sendTranscript(text: String, duration: TimeInterval?, endpointId: UUID?, source: String? = nil) {
         guard let endpointId = endpointId,
               let endpoint = endpoint(for: endpointId),
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -117,11 +119,15 @@ class WebhookManager: ObservableObject {
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
+        // Add custom headers
+        for (key, value) in endpoint.headers {
+            request.addValue(value, forHTTPHeaderField: key)
+        }
+        
         let parameters: [String: Any] = [
             "text": text,
-            "duration": duration ?? 0,
             "timestamp": ISO8601DateFormatter().string(from: Date()),
-            "source": "No-Typing"
+            "source": source ?? "No-Typing"
         ]
         
         let preview = String(text.prefix(80))
@@ -170,9 +176,13 @@ class WebhookManager: ObservableObject {
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
+        // Add custom headers
+        for (key, value) in endpoint.headers {
+            request.addValue(value, forHTTPHeaderField: key)
+        }
+        
         let parameters: [String: Any] = [
             "text": "Hello from No-Typing! This is a test webhook payload to verify connectivity.",
-            "duration": 5.0,
             "timestamp": ISO8601DateFormatter().string(from: Date()),
             "source": "No-Typing"
         ]

@@ -39,11 +39,11 @@ class AuthUtils {
         
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
-            kSecAttrService: Bundle.main.bundleIdentifier ?? "com.no_typing.oauth",
+            kSecAttrService: Bundle.main.bundleIdentifier ?? "com.no-typing.oauth",
             kSecAttrAccount: key,
             kSecValueData: dataToStore,
             kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlock,
-            kSecAttrAccessGroup: "\(TeamIdentifier).com.no_typing.oauth"
+            kSecAttrAccessGroup: "\(TeamIdentifier).com.no-typing.oauth"
         ]
         
         // First try to delete any existing item
@@ -60,9 +60,9 @@ class AuthUtils {
     static func loadFromKeychain(key: String) -> String? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
-            kSecAttrService: Bundle.main.bundleIdentifier ?? "com.no_typing.oauth",
+            kSecAttrService: Bundle.main.bundleIdentifier ?? "com.no-typing.oauth",
             kSecAttrAccount: key,
-            kSecAttrAccessGroup: "\(TeamIdentifier).com.no_typing.oauth",
+            kSecAttrAccessGroup: "\(TeamIdentifier).com.no-typing.oauth",
             kSecReturnData: kCFBooleanTrue,
             kSecMatchLimit: kSecMatchLimitOne
         ]
@@ -82,9 +82,9 @@ class AuthUtils {
     static func deleteFromKeychain(key: String) {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
-            kSecAttrService: Bundle.main.bundleIdentifier ?? "com.no_typing.oauth",
+            kSecAttrService: Bundle.main.bundleIdentifier ?? "com.no-typing.oauth",
             kSecAttrAccount: key,
-            kSecAttrAccessGroup: "\(TeamIdentifier).com.no_typing.oauth"
+            kSecAttrAccessGroup: "\(TeamIdentifier).com.no-typing.oauth"
         ]
         
         SecItemDelete(query as CFDictionary)

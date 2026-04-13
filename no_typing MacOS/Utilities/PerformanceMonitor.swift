@@ -6,9 +6,9 @@ import SwiftUI
 class PerformanceMonitor {
     static let shared = PerformanceMonitor()
     
-    private let logger = Logger(subsystem: "com.no_typing", category: "Performance")
+    private let logger = Logger(subsystem: "com.no-typing", category: "Performance")
     private var timers: [String: Date] = [:]
-    private let queue = DispatchQueue(label: "com.no_typing.performanceMonitor", attributes: .concurrent)
+    private let queue = DispatchQueue(label: "com.no-typing.performanceMonitor", attributes: .concurrent)
     
     private init() {}
     

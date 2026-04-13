@@ -6,7 +6,7 @@ import FoundationModels
 class TranscriptionCleaner {
     static let shared = TranscriptionCleaner()
     
-    private let queue = DispatchQueue(label: "com.no_typing.transcriptionCleaner")
+    private let queue = DispatchQueue(label: "com.no-typing.transcriptionCleaner")
     
     private init() {}
     

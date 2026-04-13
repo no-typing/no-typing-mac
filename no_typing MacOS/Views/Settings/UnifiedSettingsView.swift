@@ -403,6 +403,10 @@ struct UnifiedSettingsView: View {
     // MARK: - Transcribe Section
     private var transcribeSection: some View {
         VStack(alignment: .leading, spacing: 16) {
+            PageTitleView(
+                title: "Transcribe Media",
+                subtitle: "Upload an audio/video file or paste a social media link to generate a transcription offline."
+            )
             TranscribeFileView()
                 .settingsCardStyle()
         }
@@ -424,6 +428,10 @@ struct UnifiedSettingsView: View {
     // MARK: - Integrations Section
     private var integrationsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
+            PageTitleView(
+                title: "Integrations & Webhooks",
+                subtitle: "Forward completed transcripts as JSON payloads to Zapier, Make.com, n8n, Notion or any custom endpoint."
+            )
             WebhookSettingsView()
                 .settingsCardStyle()
         }
@@ -432,11 +440,10 @@ struct UnifiedSettingsView: View {
     // MARK: - Support Section
     private var supportSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Section Header
-            Text("Support & Feedback")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(.white)
-                .padding(.bottom, 8)
+            PageTitleView(
+                title: "Support & Feedback",
+                subtitle: "Get help, report issues, or share your feedback"
+            )
             
             SupportView()
                 .settingsCardStyle()
@@ -447,14 +454,10 @@ struct UnifiedSettingsView: View {
     // MARK: - Developer Section
     private var developerSection: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // Section Header
-            Text("Developer Settings")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-            
-            Text("Debug options for development")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            PageTitleView(
+                title: "Developer Settings",
+                subtitle: "Debug options for development"
+            )
             
             // Onboarding Settings
             VStack(alignment: .leading, spacing: 16) {

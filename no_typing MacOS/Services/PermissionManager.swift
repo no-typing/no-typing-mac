@@ -1,24 +1,4 @@
 /// PermissionManager is a singleton service that handles all system-level permission requests and checks.
-/// It provides a centralized way to manage:
-/// - Microphone permissions for audio capture
-/// - Accessibility permissions for system-wide features
-/// - System preferences navigation for permission settings
-///
-/// Usage:
-/// ```swift
-/// // Check microphone permission
-/// PermissionManager.shared.checkMicrophonePermission { granted in
-///     if granted {
-///         // Handle granted permission
-///     }
-/// }
-///
-/// // Check accessibility permission
-/// if PermissionManager.shared.checkAccessibilityPermission() {
-///     // Handle granted permission
-/// }
-/// ```
-
 import AVFoundation
 import ApplicationServices
 import Speech
@@ -30,12 +10,16 @@ import AppKit
 class PermissionManager {
     static let shared = PermissionManager()
     
-    private init() {}
+    private init() {
+        print("🛡️ PermissionManager initialized for bundle: \(Bundle.main.bundleIdentifier ?? "unknown")")
+    }
     
     // MARK: - Microphone Permission
     
     func checkMicrophonePermission(completion: @escaping (Bool) -> Void) {
         let permissionStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        print("🎤 DEBUG: Microphone status: \(permissionStatus.rawValue) (authorized = 3, denied = 1, restricted = 2, notDetermined = 0)")
+        
         let granted = permissionStatus == .authorized
         DispatchQueue.main.async {
             completion(granted)
@@ -48,19 +32,20 @@ class PermissionManager {
     }
     
     func requestMicrophonePermission(completion: @escaping (Bool) -> Void) {
-        print("🎤 Requesting microphone permission...")
         let permissionStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        print("🎤 Current microphone status: \(permissionStatus.rawValue)")
+        print("🎤 Requesting microphone permission for \(Bundle.main.bundleIdentifier ?? "unknown"). Current: \(permissionStatus.rawValue)")
         
         switch permissionStatus {
         case .notDetermined:
-            print("🎤 Showing system microphone permission prompt...")
-            // This should trigger the system prompt
             AVCaptureDevice.requestAccess(for: .audio) { granted in
-                print("🎤 User responded to microphone prompt: \(granted)")
+                print("🎤 Microphone access granted: \(granted)")
                 DispatchQueue.main.async {
                     completion(granted)
                 }
+            }
+        case .authorized:
+            DispatchQueue.main.async {
+                completion(true)
             }
         case .denied, .restricted:
             print("🎤 Microphone permission previously denied, opening System Settings...")
@@ -68,16 +53,27 @@ class PermissionManager {
                 self.openSystemPreferencesPrivacyMicrophone()
                 completion(false)
             }
-        case .authorized:
-            print("🎤 Microphone already authorized")
-            DispatchQueue.main.async {
-                completion(true)
-            }
         @unknown default:
-            print("🎤 Unknown microphone permission status")
-            DispatchQueue.main.async {
-                completion(false)
+            completion(false)
+        }
+    }
+    
+    private func forceRegisterMicrophone() {
+        print("🎤 DEBUG: Forcing microphone registration via AVCaptureSession...")
+        let session = AVCaptureSession()
+        guard let device = AVCaptureDevice.default(for: .audio) else { return }
+        
+        do {
+            let input = try AVCaptureDeviceInput(device: device)
+            if session.canAddInput(input) {
+                session.addInput(input)
+                session.startRunning()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    session.stopRunning()
+                }
             }
+        } catch {
+            print("🎤 DEBUG: Force registration capture failed: \(error)")
         }
     }
     
@@ -85,6 +81,12 @@ class PermissionManager {
     
     func checkSpeechRecognitionPermission(completion: @escaping (Bool) -> Void) {
         let status = SFSpeechRecognizer.authorizationStatus()
+        print("🗣️ DEBUG: Speech Recognition status: \(status.rawValue) (authorized = 3, denied = 1, restricted = 2, notDetermined = 0)")
+        
+        let locale = Locale.current
+        let isAvailable = SFSpeechRecognizer(locale: locale) != nil
+        print("🗣️ DEBUG: SFSpeechRecognizer is available for \(locale.identifier): \(isAvailable)")
+        
         DispatchQueue.main.async {
             completion(status == .authorized)
         }
@@ -95,23 +97,20 @@ class PermissionManager {
     }
     
     func requestSpeechRecognitionPermission(completion: @escaping (Bool) -> Void) {
-        print("🗣️ Requesting speech recognition permission...")
         let status = SFSpeechRecognizer.authorizationStatus()
-        print("🗣️ Current speech recognition status: \(status.rawValue)")
+        print("🗣️ Current speech recognition status: \(status.rawValue) (authorized=3, denied=1, restricted=2, notDetermined=0)")
         
         switch status {
         case .notDetermined:
-            print("🗣️ Showing system speech recognition prompt...")
             SFSpeechRecognizer.requestAuthorization { authStatus in
-                print("🗣️ User responded to speech recognition prompt: \(authStatus.rawValue)")
+                print("🗣️ Speech recognition authorization result: \(authStatus.rawValue)")
                 DispatchQueue.main.async {
-                    let granted = authStatus == .authorized
-                    if !granted {
-                        print("🗣️ Speech recognition not granted, opening System Settings...")
-                        self.openSystemPreferencesPrivacySpeech()
-                    }
-                    completion(granted)
+                    completion(authStatus == .authorized)
                 }
+            }
+        case .authorized:
+            DispatchQueue.main.async {
+                completion(true)
             }
         case .denied, .restricted:
             print("🗣️ Speech recognition previously denied, opening System Settings...")
@@ -119,27 +118,21 @@ class PermissionManager {
                 self.openSystemPreferencesPrivacySpeech()
                 completion(false)
             }
-        case .authorized:
-            print("🗣️ Speech recognition already authorized")
-            DispatchQueue.main.async {
-                completion(true)
-            }
         @unknown default:
-            print("🗣️ Unknown speech recognition status")
-            DispatchQueue.main.async {
-                completion(false)
-            }
+            completion(false)
         }
+    }
+    
+    private func forceRegisterSpeech() {
+        print("🗣️ DEBUG: Forcing speech recognition registration...")
+        _ = SFSpeechRecognizer(locale: Locale.current)
     }
     
     // MARK: - Accessibility Permission
     
     func checkAccessibilityPermission() -> Bool {
-        // print("🔑 PERMISSION: Checking accessibility permission")
         #if os(macOS)
-        let result = AXIsProcessTrusted()
-        // print("🔑 PERMISSION: Accessibility permission status: \(result)")
-        return result
+        return AXIsProcessTrusted()
         #else
         return true
         #endif
@@ -149,26 +142,14 @@ class PermissionManager {
         print("🔑 Requesting accessibility permission...")
         
         #if os(macOS)
-        let currentStatus = AXIsProcessTrusted()
-        print("🔑 Current accessibility status: \(currentStatus)")
-        
-        // First, trigger the system prompt
         let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
-        let promptShown = AXIsProcessTrustedWithOptions(options)
-        print("🔑 Accessibility prompt shown: \(promptShown)")
+        let _ = AXIsProcessTrustedWithOptions(options)
         
-        // Give the user a moment to respond to the prompt
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             let newStatus = AXIsProcessTrusted()
-            print("🔑 New accessibility status: \(newStatus)")
-            
             if !newStatus {
-                print("🔑 Permission not granted, opening System Settings...")
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                    NSWorkspace.shared.open(url)
-                }
+                self.openSystemPreferencesPrivacyAccessibility()
             }
-            
             completion(newStatus)
         }
         #else
@@ -191,6 +172,14 @@ class PermissionManager {
     func openSystemPreferencesPrivacySpeech() {
         #if os(macOS)
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition") {
+            NSWorkspace.shared.open(url)
+        }
+        #endif
+    }
+    
+    func openSystemPreferencesPrivacyAccessibility() {
+        #if os(macOS)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
         #endif

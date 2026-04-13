@@ -36,7 +36,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
-        if url.scheme == "com.no_typing.oauth" {
+        if url.scheme == "com.no-typing.oauth" {
             // OAuth handling removed
             return true
         }
@@ -265,10 +265,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate, SPUStand
     func application(_ application: NSApplication, open urls: [URL]) {
         if let url = urls.first {
             switch url.scheme {
-            case "com.no_typing.oauth":
+            case "com.no-typing.oauth":
                 // OAuth handling removed
                 break
-            case "no_typing":
+            case "no-typing":
                 // Deep link handling removed
                 break
             default:

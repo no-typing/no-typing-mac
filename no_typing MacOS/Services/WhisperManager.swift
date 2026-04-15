@@ -615,6 +615,15 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
             let process = Process()
             process.executableURL = whisperURL
             
+            // Point the subprocess to the app bundle's Resources directory
+            // so it can find default.metallib for Metal GPU acceleration
+            let resourcesDir = whisperURL.deletingLastPathComponent()
+            process.currentDirectoryURL = resourcesDir
+            process.environment = ProcessInfo.processInfo.environment.merging(
+                ["GGML_METAL_PATH_RESOURCES": resourcesDir.path],
+                uniquingKeysWith: { _, new in new }
+            )
+            
             // Generate a tiny silent WAV file for validation
             // (whisper requires a valid audio file, not a text file)
             let tempDir = FileManager.default.temporaryDirectory
@@ -794,6 +803,17 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
             let process = Process()
             process.executableURL = self.getWhisperExecutable()
+            
+            // Point the subprocess to the app bundle's Resources directory
+            // so it can find default.metallib for Metal GPU acceleration
+            if let execURL = process.executableURL {
+                let resourcesDir = execURL.deletingLastPathComponent()
+                process.currentDirectoryURL = resourcesDir
+                process.environment = ProcessInfo.processInfo.environment.merging(
+                    ["GGML_METAL_PATH_RESOURCES": resourcesDir.path],
+                    uniquingKeysWith: { _, new in new }
+                )
+            }
 
             // Set up pipes for output
             let outputPipe = Pipe()
@@ -946,6 +966,17 @@ class WhisperManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
             let process = Process()
             process.executableURL = self.getWhisperExecutable()
+            
+            // Point the subprocess to the app bundle's Resources directory
+            // so it can find default.metallib for Metal GPU acceleration
+            if let execURL = process.executableURL {
+                let resourcesDir = execURL.deletingLastPathComponent()
+                process.currentDirectoryURL = resourcesDir
+                process.environment = ProcessInfo.processInfo.environment.merging(
+                    ["GGML_METAL_PATH_RESOURCES": resourcesDir.path],
+                    uniquingKeysWith: { _, new in new }
+                )
+            }
 
             // Set up pipes for output
             let outputPipe = Pipe()

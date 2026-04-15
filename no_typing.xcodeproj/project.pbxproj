@@ -94,9 +94,10 @@
 			);
 			target = 2369467E2CB1F357002E8CBD /* no_typing MacOS */;
 		};
-		236D39C32CDDA2E400F8B429 /* Exceptions for "Resources" folder in "no_typing MacOS" target */ = {
+		CE83E03C2F8FFBE800A0956C /* Exceptions for "Resources" folder in "no_typing MacOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Whisper/default.metallib,
 				Whisper/whisper,
 			);
 			target = 2369467E2CB1F357002E8CBD /* no_typing MacOS */;
@@ -132,7 +133,7 @@
 		23C5D3CB2CC3BE6D00C043F0 /* Resources */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				236D39C32CDDA2E400F8B429 /* Exceptions for "Resources" folder in "no_typing MacOS" target */,
+				CE83E03C2F8FFBE800A0956C /* Exceptions for "Resources" folder in "no_typing MacOS" target */,
 				2368A98F2D714FB200BDFFE7 /* Exceptions for "Resources" folder in "Copy Files" phase from "no_typing MacOS" target */,
 			);
 			path = Resources;

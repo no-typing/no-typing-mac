@@ -4,7 +4,12 @@
   # No-Typing - Open Source Speech-to-Text for macOS
 </div>
 
-[No-Typing](https://www.no-typing.com) is a powerful, open-source macOS application that provides fast speech-to-text transcription. Replace typing with natural speech - just hold down a hotkey, speak, and watch your words appear instantly. It supports both **Local, privacy-first AI** via Whisper, and **Lightning-fast Cloud AI** via top providers.
+[No-Typing](https://www.no-typing.com) is a powerful, open-source macOS application that provides fast speech-to-text transcription. Replace typing with natural speech - just hold down a hotkey, speak, and watch your words appear instantly. It supports both **Local, privacy-first Transcription** via Whisper, and **Lightning-fast Cloud Transcription** via top providers.
+
+## Why No-Typing?
+- **100% Transparent**: Unlike some alternatives, No-Typing is fully open-source. You know exactly how your audio is handled.
+- **Privacy First**: Your data remains yours. Inspect the codebase freely, and rest easy knowing No-Typing doesn't harvest your data. Use local models for air-gapped security, or your own secure API keys for cloud providers.
+- **Free & Community Driven**: Built for the community, by the community. No hidden costs.
 
 ## Features
 
@@ -16,28 +21,30 @@
 - Support for **Parakeet v3** (up to **500× realtime transcription**) on M-series Macs
 - Supports **100+ languages**
 - Select transcription language or use auto-detect
-- Menubar app for quick access to Whisper
-- Global spotlight-style interface for instant transcription and pasting
-- ChatGPT integration (using your own API key)
-- Anthropic Claude integration (with your own API key)
-- Translate transcripts using **DeepL API**
+- Supports Cloud Model integration (using your own API key)
+- Translate transcripts using **DeepL API and Top AI providers**
 - Automatically remove filler words (ums, uhhs, etc.)
 - Ignore segments such as `[SILENCE]`, `[BLANK_AUDIO]`, `[NOISE]` in transcripts
 
 - AI text rewriting integrations:
   - OpenAI (ChatGPT)
   - Anthropic (Claude)
-  - Groq
+  - Google (Gemini)
+  - Deepseek
+  - Many more...
 
 - Cloud transcription support via:
   - OpenAI
   - ElevenLabs
   - Deepgram
   - Groq
+  - Custom API
 
 - Whisper model support:
+  - Base
   - Small
   - Large (v3, Turbo)
+  - Custom supported model link
 
 - Parakeet model support:
   - Parakeet (v2, v3)
@@ -52,22 +59,20 @@
   - GPT-4o-mini
   - Legacy models
 
-- Integrations enabled via Custom Webhooks:
+- Integrations enabled via Custom Webhooks (Send transcripts to your own pipeline):
   - Make.com
   - n8n
   - Zapier
-  - Custom Webhooks
+  - Custom Webhooks, etc.
 
 - Additional AI & Cloud integrations (via Custom Endpoints/Servers):
   - Ollama
   - XAI
-  - DeepSeek
   - Azure AI models
   - Custom OpenAI compatible endpoints
   - Custom Whisper servers
 
 - Record and transcribe audio files directly on your Mac
-- Inline video player (video playback synced with subtitles)
 - Automatic spelling, punctuation, and grammar correction in dictation mode
 - Transcribe videos from **YouTube, TikTok, Instagram, Facebook, and Vimeo**
 - Transcribe podcasts by combining single-track audio for each host (beta)
@@ -95,9 +100,6 @@
 - Add custom **GGML models**
 - Translate audio into another language using Whisper
 - Translate subtitles into multiple languages
-
-### Privacy Focused & Open Source
-- Your data remains yours. Inspect the codebase freely, and rest easy knowing we don't harvest your data. Use local models for air-gapped security, or your own secure API keys for cloud providers.
 
 ## Installation
 

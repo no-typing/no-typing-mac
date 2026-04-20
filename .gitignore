@@ -146,3 +146,4 @@ xcuserdata/
 
 .cursor/
 whisper_build/
+whisper_build/*

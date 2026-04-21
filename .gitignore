@@ -147,3 +147,4 @@ xcuserdata/
 .cursor/
 whisper_build/
 whisper_build/*
+xcodebuild_output.txt

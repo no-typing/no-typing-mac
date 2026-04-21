@@ -1,8 +1,10 @@
 <div align="center">
   <img src="assets/icon.png" alt="No-Typing Icon" width="120" height="120">
   
-  # No-Typing - Open Source Speech-to-Text for macOS
+  # No-Typing - Open Source Speech-to-Text (Dictation) app for macOS
 </div>
+
+If you're looking to avoid MacWhisper's \$45 flat fee or WhisperFlow's \$12/month subscription, No-Typing offers a streamlined alternative that covers exactly what most users actually need. Entirely Free.
 
 [No-Typing](https://www.no-typing.com) is a powerful, open-source macOS application that provides fast speech-to-text transcription. Replace typing with natural speech - just hold down a hotkey, speak, and watch your words appear instantly. It supports both **Local, privacy-first Transcription** via Whisper, and **Lightning-fast Cloud Transcription** via top providers.
 
@@ -13,7 +15,7 @@
 
 ## Features
 
-- System-wide dictation using Whisper (replaces Apple’s dictation)
+- System-wide dictation using Whisper (replaces Apple's dictation)
 - Record directly from your microphone or any input device on your Mac
 - All transcription runs locally — no data leaves your machine
 - Metal and GPU acceleration for extremely fast transcription

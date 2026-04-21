@@ -3,6 +3,7 @@ import SwiftUI
 struct UnifiedSettingsView: View {
     @EnvironmentObject var audioManager: AudioManager
     @StateObject private var hotkeyManager = HotkeyManager.shared
+    @StateObject private var updateChecker = UpdateCheckService.shared
     @StateObject private var whisperManager = WhisperManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedSection: SettingsSection = .recentActivity
@@ -129,6 +130,31 @@ struct UnifiedSettingsView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                         .padding(.leading, 4)
+                    } else if updateChecker.updateAvailable {
+                        Button(action: {
+                            NSWorkspace.shared.open(UpdateCheckService.downloadPageURL)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.down")
+                                    .font(.system(size: 10))
+                                Text("Update Available")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.green.opacity(0.5), Color.green.opacity(0.5)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.leading, 4)
+                        .help(updateChecker.latestVersion.map { "Version \($0) is available — click to download" } ?? "A new version is available")
                     }
                     
                     Spacer()
@@ -139,6 +165,7 @@ struct UnifiedSettingsView: View {
                         Text("Dictation")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white)
+                            .fixedSize()
                         Toggle("", isOn: $audioManager.isRecordingEnabled)
                             .toggleStyle(.switch)
                             .labelsHidden()
@@ -265,6 +292,7 @@ struct UnifiedSettingsView: View {
 
         .onAppear {
             checkForIssues()
+            updateChecker.checkForUpdates()
         }
         .onChange(of: selectedLanguage) { newValue in
             NotificationCenter.default.post(

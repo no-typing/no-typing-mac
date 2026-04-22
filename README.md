@@ -106,10 +106,7 @@ If you're looking to avoid MacWhisper's \$45 flat fee or WhisperFlow's \$12/mont
 ## Installation
 
 ### Download Pre-built App
-1. Download latest version from [no-typing.com](https://www.no-typing.com)
-2. Open the DMG and drag No-Typing to your Applications folder.
-3. The app is currently unsigned. On first launch, macOS will block it. Go to **System Settings → Privacy & Security**, scroll down, and click **"Open Anyway"** to allow No-Typing to run.
-4. Launch No-Typing and follow the onboarding wizard to grant the necessary Microphone and Accessibility permissions.
+Currently not available. Please build from source.
 
 ### Build from Source
 ```bash
